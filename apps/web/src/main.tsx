@@ -18,6 +18,8 @@ declare global {
       WebApp?: {
         ready: () => void;
         expand: () => void;
+        /** Raw signed payload. This is the only value the backend trusts. */
+        initData?: string;
         initDataUnsafe?: { user?: { id: number; first_name?: string; username?: string } };
       };
     };
@@ -43,7 +45,10 @@ type ConnectionStatus = 'connecting' | 'connected' | 'offline';
 type SessionPhase = 'idle' | 'resuming' | 'active';
 
 function App() {
+  // `initDataUnsafe` is only used for prefilling the display name. Identity is
+  // proven server-side from the signed `initData` string.
   const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
+  const initData = window.Telegram?.WebApp?.initData ?? '';
   const defaultName = tgUser?.first_name || tgUser?.username || 'بازیکن حکم';
   const initialApiUrl = resolveInitialApiUrl();
   const [apiUrl, setApiUrlState] = useState(initialApiUrl);
@@ -183,7 +188,7 @@ function App() {
       const response = await fetch(`${apiUrl}/rooms`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ hostName: name, telegramId: tgUser?.id }),
+        body: JSON.stringify({ hostName: name, ...(initData ? { initData } : {}) }),
       });
       const nextRoom = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -219,7 +224,7 @@ function App() {
       const response = await fetch(`${targetApiUrl}/rooms/${roomId}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, telegramId: tgUser?.id }),
+        body: JSON.stringify({ name, ...(initData ? { initData } : {}) }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
@@ -229,7 +234,9 @@ function App() {
       activateSession(nextSession);
       setRoom(data.room);
     } catch (error) {
-      if (error instanceof HokmRequestError && error.code === 'ROOM_NOT_FOUND') {
+      if (error instanceof HokmRequestError && error.code.startsWith('TELEGRAM_AUTH')) {
+        setToast(error.message);
+      } else if (error instanceof HokmRequestError && error.code === 'ROOM_NOT_FOUND') {
         forgetSession('این میز روی سرور پیدا نشد. احتمالاً لینک قدیمی است یا بک‌اند بعد از ساخت میز ری‌استارت شده. لطفاً در ربات /newgame بزن و لینک جدید را باز کن.');
       } else if (error instanceof HokmRequestError) {
         setToast(error.message);

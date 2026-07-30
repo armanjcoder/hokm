@@ -23,9 +23,13 @@ export class ServerHarness {
     this.dbDir = path.dirname(dbPath);
   }
 
-  static async create(): Promise<ServerHarness> {
+  /** Extra environment variables applied to the child process. */
+  env: Record<string, string> = {};
+
+  static async create(env: Record<string, string> = {}): Promise<ServerHarness> {
     const dbDir = mkdtempSync(path.join(os.tmpdir(), 'hokm-e2e-'));
     const harness = new ServerHarness(await findFreePort(), path.join(dbDir, 'hokm.sqlite'));
+    harness.env = env;
     return harness;
   }
 
@@ -44,6 +48,7 @@ export class ServerHarness {
         SERVE_WEB_DIST: 'false',
         TELEGRAM_BOT_TOKEN: '',
         CORS_ORIGIN: '*',
+        ...this.env,
       },
       stdio: 'ignore',
     });

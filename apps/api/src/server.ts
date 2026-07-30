@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { SqliteRoomStore } from './storage.js';
 import { errorBody, localizeErrorCode } from './messages.js';
 import { createPlayerToken, verifyPlayerSession, withoutToken } from './session.js';
+import { telegramDisplayName, verifyInitData, type TelegramUser } from './telegram-auth.js';
 import {
   chooseTrump,
   continueToNextHand,
@@ -37,6 +38,10 @@ const webAppUrl = normalizeEnvUrl(process.env.WEB_APP_URL ?? defaultPublicUrl);
 const publicApiUrl = normalizeEnvUrl(process.env.PUBLIC_API_URL ?? webAppUrl);
 const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN ?? webAppUrl).map(normalizeEnvUrl);
 const dbPath = resolveFromApiRoot(process.env.DB_PATH ?? './data/hokm.sqlite');
+const botToken = process.env.TELEGRAM_BOT_TOKEN ?? '';
+// Telegram identities are only trusted when we hold a bot token to verify them
+// with. Without one (pure local development) we fall back to guest players.
+const telegramAuthEnabled = botToken !== '' && process.env.ALLOW_UNVERIFIED_TELEGRAM !== 'true';
 const roomStore = await SqliteRoomStore.open(dbPath);
 
 interface RoomPlayer {
@@ -63,6 +68,11 @@ const loadedRooms = roomStore.loadRooms<Room>().map(normalizeLoadedRoom);
 const rooms = new Map<string, Room>(loadedRooms.map((room) => [room.id, room]));
 
 console.log(`Hokm config: web=${webAppUrl} api=${publicApiUrl} db=${dbPath} loadedRooms=${loadedRooms.length}`);
+console.log(
+  telegramAuthEnabled
+    ? 'Telegram auth: ENABLED (initData signatures are verified).'
+    : 'Telegram auth: DISABLED (guest mode). Set TELEGRAM_BOT_TOKEN to verify real Telegram users.',
+);
 
 const app = express();
 app.use(cors({ origin: corsOriginHandler, credentials: true }));
@@ -80,7 +90,8 @@ app.get('/rooms/:roomId', (req, res) => {
 
 app.post('/rooms', (req, res) => {
   const body = createRoomSchema.parse(req.body);
-  const room = createRoom(body.hostName, body.telegramId);
+  const identity = authenticate(body.initData);
+  const room = createRoom(identity.name ?? body.hostName, identity.telegramId);
   persistRoom(room);
   const host = room.players[0];
   res.status(201).json({ ...sanitizeRoom(room), token: host?.token });
@@ -89,7 +100,8 @@ app.post('/rooms', (req, res) => {
 app.post('/rooms/:roomId/join', (req, res) => {
   const room = requireRoom(req.params.roomId);
   const body = joinRoomSchema.parse(req.body);
-  const player = joinRoom(room, body.name, body.telegramId);
+  const identity = authenticate(body.initData);
+  const player = joinRoom(room, identity.name ?? body.name, identity.telegramId);
   persistRoom(room);
   void emitRoom(room);
   res.json({ room: sanitizeRoom(room), player, token: player.token });
@@ -225,7 +237,11 @@ httpServer.listen(port, () => {
   console.log(`Hokm API listening on http://localhost:${port}`);
 });
 
-void startTelegramBot();
+// The bot is optional infrastructure: if Telegram is unreachable the game API
+// must keep serving, so failures here are logged instead of crashing the process.
+void startTelegramBot().catch((error) => {
+  console.error('Telegram bot could not start; the API keeps running without it.', error);
+});
 
 async function startTelegramBot() {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -314,10 +330,17 @@ function createRoom(hostName: string, telegramId?: number): Room {
 }
 
 function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
+  // A verified Telegram user always gets their previous seat back, even mid-game
+  // and even from a new device, because their identity is now proven.
+  const existing = telegramId !== undefined ? room.players.find((p) => p.telegramId === telegramId) : undefined;
+  if (existing) {
+    existing.name = name;
+    // Issue a fresh token so a reinstalled client can control the seat again.
+    existing.token = createPlayerToken();
+    return existing;
+  }
   if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
   if (room.players.length >= 4) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
-  const existing = telegramId ? room.players.find((p) => p.telegramId === telegramId) : undefined;
-  if (existing) return existing;
   const takenSeats = new Set(room.players.map((p) => p.seat));
   const seat = ([0, 1, 2, 3] as Seat[]).find((s) => !takenSeats.has(s));
   if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
@@ -430,6 +453,38 @@ function viewFor(room: Room, playerId?: string) {
  * Verifies the caller owns the seat they claim.
  * Returns a freshly adopted token when the seat came from a pre-token snapshot.
  */
+interface Identity {
+  telegramId?: number;
+  name?: string;
+}
+
+/**
+ * Turns raw `initData` into a trusted identity.
+ *
+ * When Telegram auth is enabled the signature must verify, so a client can no
+ * longer simply post someone else's telegramId to steal their seat.
+ */
+function authenticate(initData: string | undefined): Identity {
+  if (!telegramAuthEnabled) return {};
+
+  const result = verifyInitData(initData, botToken);
+  if (!result.ok) {
+    if (result.reason === 'MISSING_INIT_DATA') {
+      throw new HttpError(401, 'TELEGRAM_AUTH_REQUIRED', localizeErrorCode('TELEGRAM_AUTH_REQUIRED'));
+    }
+    if (result.reason === 'EXPIRED_INIT_DATA') {
+      throw new HttpError(401, 'TELEGRAM_AUTH_EXPIRED', localizeErrorCode('TELEGRAM_AUTH_EXPIRED'));
+    }
+    throw new HttpError(401, 'TELEGRAM_AUTH_FAILED', localizeErrorCode('TELEGRAM_AUTH_FAILED'));
+  }
+  return identityFromUser(result.user);
+}
+
+function identityFromUser(user: TelegramUser): Identity {
+  const name = telegramDisplayName(user);
+  return { telegramId: user.id, ...(name ? { name } : {}) };
+}
+
 function requireSession(room: Room, playerId: string, token: string | undefined): string | undefined {
   const result = verifyPlayerSession(room.players, playerId, token);
   if (!result.ok) {
@@ -498,8 +553,8 @@ function corsOriginHandler(origin: string | undefined, callback: (err: Error | n
   callback(new Error(`Origin ${origin} is not allowed by CORS.`));
 }
 
-const createRoomSchema = z.object({ hostName: z.string().min(1).max(40).default('بازیکن'), telegramId: z.number().optional() });
-const joinRoomSchema = z.object({ name: z.string().min(1).max(40), telegramId: z.number().optional() });
+const createRoomSchema = z.object({ hostName: z.string().min(1).max(40).default('بازیکن'), initData: z.string().max(4096).optional() });
+const joinRoomSchema = z.object({ name: z.string().min(1).max(40), initData: z.string().max(4096).optional() });
 const socketJoinSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional() });
 const suitSchema: z.ZodType<Suit> = z.enum(['spades', 'hearts', 'diamonds', 'clubs']);
 const chooseTrumpSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional(), suit: suitSchema });
