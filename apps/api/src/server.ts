@@ -108,6 +108,12 @@ app.post('/rooms/:roomId/start', (req, res) => {
 
 if (shouldServeWebDist) {
   if (existsSync(webDistPath)) {
+    app.use((_req, res, next) => {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      next();
+    });
     app.use(express.static(webDistPath));
     app.get('*', (_req, res) => {
       res.sendFile(path.join(webDistPath, 'index.html'));
@@ -257,6 +263,7 @@ function createRoom(hostName: string, telegramId?: number): Room {
     players: [{ id: randomCode(12), name: hostName, seat: 0, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) }],
   };
   rooms.set(room.id, room);
+  persistRoom(room);
   return room;
 }
 
