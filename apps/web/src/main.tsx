@@ -25,7 +25,7 @@ declare global {
 }
 
 type RoomStatus = 'lobby' | 'playing' | 'finished';
-interface RoomPlayer { id: string; name: string; telegramId?: number; seat: number; connected: boolean }
+interface RoomPlayer { id: string; name: string; telegramId?: number; seat: number; connected: boolean; isBot?: boolean }
 interface RoomView {
   id: string;
   code: string;
@@ -136,6 +136,12 @@ function App() {
     if (!response.ok) setToast('برای شروع باید هر ۴ بازیکن داخل میز باشند.');
   }
 
+  async function addTestBots() {
+    if (!room) return;
+    const response = await fetch(`${apiUrl}/rooms/${room.id}/add-bots`, { method: 'POST' });
+    if (!response.ok) setToast('اضافه کردن ربات‌های تست انجام نشد.');
+  }
+
   function chooseSuit(suit: Suit) {
     if (!session) return;
     socket.emit('game:choose_trump', { ...session, suit }, ackToast);
@@ -175,7 +181,7 @@ function App() {
   return (
     <main className="app-shell">
       <TopBar room={room} me={me} apiUrl={apiUrl} />
-      {room.status === 'lobby' && <Lobby room={room} startGame={startGame} invite={() => shareRoom(room.id, apiUrl)} />}
+      {room.status === 'lobby' && <Lobby room={room} startGame={startGame} addTestBots={addTestBots} invite={() => shareRoom(room.id, apiUrl)} />}
       {room.status !== 'lobby' && game && (
         <GameTable
           room={room}
@@ -231,7 +237,7 @@ function TopBar({ room, me, apiUrl }: { room: RoomView; me: RoomPlayer | undefin
   );
 }
 
-function Lobby({ room, startGame, invite }: { room: RoomView; startGame: () => void; invite: () => void }) {
+function Lobby({ room, startGame, addTestBots, invite }: { room: RoomView; startGame: () => void; addTestBots: () => void; invite: () => void }) {
   return (
     <section className="panel lobby-panel">
       <h2>لابی میز</h2>
@@ -239,13 +245,16 @@ function Lobby({ room, startGame, invite }: { room: RoomView; startGame: () => v
       <div className="seat-grid">
         {[0, 1, 2, 3].map((seat) => {
           const player = room.players.find((p) => p.seat === seat);
-          return <div className="seat-card" key={seat}><span>صندلی {seat + 1}</span><strong>{player?.name ?? 'در انتظار بازیکن...'}</strong></div>;
+          return <div className="seat-card" key={seat}><span>صندلی {seat + 1}</span><strong>{player ? `${player.name}${player.isBot ? ' 🤖' : ''}` : 'در انتظار بازیکن...'}</strong></div>;
         })}
       </div>
       <div className="row-actions">
         <button className="primary" onClick={startGame}>شروع بازی</button>
         <button className="ghost" onClick={invite}>دعوت دوستان</button>
       </div>
+      {room.players.length < 4 && (
+        <button className="test-bots-button" onClick={addTestBots}>تست تک‌نفره: اضافه کردن ربات‌ها 🤖</button>
+      )}
     </section>
   );
 }

@@ -37,6 +37,7 @@ interface RoomPlayer {
   telegramId?: number;
   seat: Seat;
   connected: boolean;
+  isBot?: boolean;
 }
 
 interface Room {
@@ -78,6 +79,13 @@ app.post('/rooms/:roomId/join', (req, res) => {
   res.json({ room: sanitizeRoom(room), player });
 });
 
+app.post('/rooms/:roomId/add-bots', (req, res) => {
+  const room = requireRoom(req.params.roomId);
+  addTestBots(room);
+  void emitRoom(room);
+  return res.json(sanitizeRoom(room));
+});
+
 app.post('/rooms/:roomId/start', (req, res) => {
   const room = requireRoom(req.params.roomId);
   if (room.players.length !== 4) {
@@ -85,6 +93,7 @@ app.post('/rooms/:roomId/start', (req, res) => {
   }
   room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })), { id: room.id, targetScore: 7 });
   room.status = 'playing';
+  autoAdvanceBots(room);
   void emitRoom(room);
   return res.json(sanitizeRoom(room));
 });
@@ -136,6 +145,7 @@ io.on('connection', (socket) => {
       const room = requireRoom(roomId);
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
       room.game = chooseTrump(room.game, playerId, suit);
+      autoAdvanceBots(room);
       ack?.({ ok: true });
       void emitRoom(room);
     } catch (error) {
@@ -149,6 +159,7 @@ io.on('connection', (socket) => {
       const room = requireRoom(roomId);
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
       room.game = playCard(room.game, playerId, cardId);
+      autoAdvanceBots(room);
       if (room.game.phase === 'game_complete') room.status = 'finished';
       ack?.({ ok: true });
       void emitRoom(room);
@@ -163,6 +174,7 @@ io.on('connection', (socket) => {
       const room = requireRoom(roomId);
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
       room.game = continueToNextHand(room.game);
+      autoAdvanceBots(room);
       ack?.({ ok: true });
       void emitRoom(room);
     } catch (error) {
@@ -234,6 +246,67 @@ function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
   const player: RoomPlayer = { id: randomCode(12), name, seat, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) };
   room.players.push(player);
   return player;
+}
+
+function addTestBots(room: Room): void {
+  if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', 'Room has already started.');
+  const botNames = ['ربات نیکا', 'ربات آرش', 'ربات سارا'];
+  let botIndex = room.players.filter((player) => player.isBot).length;
+  while (room.players.length < 4) {
+    const takenSeats = new Set(room.players.map((player) => player.seat));
+    const seat = ([0, 1, 2, 3] as Seat[]).find((candidate) => !takenSeats.has(candidate));
+    if (seat === undefined) return;
+    room.players.push({
+      id: `bot_${randomCode(10).toLowerCase()}`,
+      name: botNames[botIndex % botNames.length] ?? `ربات ${botIndex + 1}`,
+      seat,
+      connected: true,
+      isBot: true,
+    });
+    botIndex += 1;
+  }
+}
+
+function autoAdvanceBots(room: Room): void {
+  if (!room.game) return;
+  for (let guard = 0; guard < 80; guard += 1) {
+    if (!room.game || room.game.phase === 'game_complete') {
+      room.status = 'finished';
+      return;
+    }
+    if (room.game.phase === 'hand_complete') return;
+
+    const bot = room.players.find((player) => player.isBot && player.seat === room.game?.currentTurnSeat);
+    if (!bot) return;
+
+    if (room.game.phase === 'waiting_for_trump') {
+      room.game = chooseTrump(room.game, bot.id, chooseBotTrump(room.game, bot.seat));
+      continue;
+    }
+
+    if (room.game.phase !== 'playing') return;
+    const validCards = getValidCards(room.game, bot.id);
+    const card = chooseBotCard(validCards);
+    if (!card) return;
+    room.game = playCard(room.game, bot.id, card.id);
+  }
+}
+
+function chooseBotTrump(game: HokmGameState, seat: Seat): Suit {
+  const suitScores: Record<Suit, number> = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
+  for (const card of game.hands[seat]) {
+    suitScores[card.suit] += 10 + botRankValue(card);
+  }
+  return (Object.entries(suitScores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'spades') as Suit;
+}
+
+function chooseBotCard(cards: Card[]): Card | undefined {
+  return [...cards].sort((a, b) => botRankValue(a) - botRankValue(b))[0];
+}
+
+function botRankValue(card: Card): number {
+  const values: Record<Card['rank'], number> = { A: 14, K: 13, Q: 12, J: 11, '10': 10, '9': 9, '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2 };
+  return values[card.rank];
 }
 
 async function emitRoom(room: Room) {

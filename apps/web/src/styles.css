@@ -49,6 +49,7 @@ label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
 .seat-card span { color: #a8a8ba; font-size: 13px; }
 .seat-card strong { font-size: 18px; }
 .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.test-bots-button { width: 100%; margin-top: 10px; color: #111827; background: linear-gradient(135deg, #fff3b0, #ffc857); border-radius: 18px; padding: 14px 18px; font-weight: 900; box-shadow: 0 12px 28px rgba(255, 200, 87, .18); }
 
 .table-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: calc(100vh - 92px); gap: 12px; }
 .score-strip { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 10px; }
