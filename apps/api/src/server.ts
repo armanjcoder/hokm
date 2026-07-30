@@ -1,4 +1,4 @@
-import 'dotenv/config';
+import { config as loadEnv } from 'dotenv';
 import cors from 'cors';
 import express from 'express';
 import { existsSync } from 'node:fs';
@@ -23,15 +23,19 @@ import {
   type Suit,
 } from '@hokm/game-engine';
 
-const port = Number(process.env.PORT ?? 4000);
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const apiRoot = path.resolve(__dirname, '..');
+loadEnv({ path: path.join(apiRoot, '.env') });
+
+const port = Number(process.env.PORT ?? 4000);
 const shouldServeWebDist = process.env.SERVE_WEB_DIST === 'true';
-const webDistPath = path.resolve(__dirname, '../../web/dist');
+const webDistPath = path.resolve(apiRoot, '../web/dist');
 const defaultPublicUrl = `http://localhost:${port}`;
-const webAppUrl = process.env.WEB_APP_URL ?? defaultPublicUrl;
-const publicApiUrl = process.env.PUBLIC_API_URL ?? webAppUrl;
-const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN ?? webAppUrl);
-const roomStore = await SqliteRoomStore.open(process.env.DB_PATH ?? './data/hokm.sqlite');
+const webAppUrl = normalizeEnvUrl(process.env.WEB_APP_URL ?? defaultPublicUrl);
+const publicApiUrl = normalizeEnvUrl(process.env.PUBLIC_API_URL ?? webAppUrl);
+const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN ?? webAppUrl).map(normalizeEnvUrl);
+const dbPath = resolveFromApiRoot(process.env.DB_PATH ?? './data/hokm.sqlite');
+const roomStore = await SqliteRoomStore.open(dbPath);
 
 interface RoomPlayer {
   id: string;
@@ -51,9 +55,10 @@ interface Room {
   game?: HokmGameState;
 }
 
-const rooms = new Map<string, Room>(
-  roomStore.loadRooms<Room>().map((room) => [room.id, normalizeLoadedRoom(room)]),
-);
+const loadedRooms = roomStore.loadRooms<Room>().map(normalizeLoadedRoom);
+const rooms = new Map<string, Room>(loadedRooms.map((room) => [room.id, room]));
+
+console.log(`Hokm config: web=${webAppUrl} api=${publicApiUrl} db=${dbPath} loadedRooms=${loadedRooms.length}`);
 
 const app = express();
 app.use(cors({ origin: corsOriginHandler, credentials: true }));
@@ -415,6 +420,16 @@ function buildWebAppUrl(params: Record<string, string> = {}) {
 
 function parseCorsOrigins(value: string) {
   return value.split(',').map((origin) => origin.trim()).filter(Boolean);
+}
+
+function normalizeEnvUrl(value: string): string {
+  const trimmed = value.trim().replace(/\/$/, '');
+  const markdownUrl = trimmed.match(/https?:\/\/[^)\]\s]+/);
+  return markdownUrl?.[0]?.replace(/\/$/, '') ?? trimmed;
+}
+
+function resolveFromApiRoot(value: string): string {
+  return path.isAbsolute(value) ? value : path.resolve(apiRoot, value);
 }
 
 function corsOriginHandler(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
