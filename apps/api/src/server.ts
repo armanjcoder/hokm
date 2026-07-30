@@ -9,6 +9,7 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { Server } from 'socket.io';
 import { z } from 'zod';
 import { SqliteRoomStore } from './storage.js';
+import { errorBody, localizeErrorCode } from './messages.js';
 import {
   chooseTrump,
   continueToNextHand,
@@ -70,7 +71,7 @@ app.get('/health', (_req, res) => {
 
 app.get('/rooms/:roomId', (req, res) => {
   const room = rooms.get(req.params.roomId);
-  if (!room) return res.status(404).json({ error: 'ROOM_NOT_FOUND' });
+  if (!room) return res.status(404).json(errorBody('ROOM_NOT_FOUND'));
   return res.json(sanitizeRoom(room));
 });
 
@@ -101,7 +102,7 @@ app.post('/rooms/:roomId/add-bots', (req, res) => {
 app.post('/rooms/:roomId/start', (req, res) => {
   const room = requireRoom(req.params.roomId);
   if (room.players.length !== 4) {
-    return res.status(400).json({ error: 'ROOM_NOT_FULL' });
+    return res.status(400).json(errorBody('ROOM_NOT_FULL'));
   }
   room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })), { id: room.id, targetScore: 7 });
   room.status = 'playing';
@@ -129,11 +130,13 @@ if (shouldServeWebDist) {
 }
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  if (err instanceof z.ZodError) return res.status(400).json({ error: 'VALIDATION_ERROR', details: err.flatten() });
-  if (err instanceof HokmError) return res.status(400).json({ error: err.code, message: err.message });
-  if (err instanceof HttpError) return res.status(err.status).json({ error: err.code, message: err.message });
+  if (err instanceof z.ZodError) {
+    return res.status(400).json({ ...errorBody('VALIDATION_ERROR'), details: err.flatten() });
+  }
+  if (err instanceof HokmError) return res.status(400).json(errorBody(err.code, err.message));
+  if (err instanceof HttpError) return res.status(err.status).json(errorBody(err.code, err.message));
   console.error(err);
-  return res.status(500).json({ error: 'INTERNAL_SERVER_ERROR' });
+  return res.status(500).json(errorBody('INTERNAL_SERVER_ERROR'));
 });
 
 const httpServer = createServer(app);
@@ -162,7 +165,7 @@ io.on('connection', (socket) => {
     try {
       const { roomId, playerId, suit } = chooseTrumpSchema.parse(payload);
       const room = requireRoom(roomId);
-      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
+      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
       room.game = chooseTrump(room.game, playerId, suit);
       autoAdvanceBots(room);
       persistRoom(room);
@@ -177,7 +180,7 @@ io.on('connection', (socket) => {
     try {
       const { roomId, playerId, cardId } = playCardSchema.parse(payload);
       const room = requireRoom(roomId);
-      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
+      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
       room.game = playCard(room.game, playerId, cardId);
       autoAdvanceBots(room);
       if (room.game.phase === 'game_complete') room.status = 'finished';
@@ -193,7 +196,7 @@ io.on('connection', (socket) => {
     try {
       const { roomId } = nextHandSchema.parse(payload);
       const room = requireRoom(roomId);
-      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
+      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
       room.game = continueToNextHand(room.game);
       autoAdvanceBots(room);
       persistRoom(room);
@@ -273,20 +276,20 @@ function createRoom(hostName: string, telegramId?: number): Room {
 }
 
 function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
-  if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', 'Room has already started.');
-  if (room.players.length >= 4) throw new HttpError(400, 'ROOM_FULL', 'Room is full.');
+  if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
+  if (room.players.length >= 4) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
   const existing = telegramId ? room.players.find((p) => p.telegramId === telegramId) : undefined;
   if (existing) return existing;
   const takenSeats = new Set(room.players.map((p) => p.seat));
   const seat = ([0, 1, 2, 3] as Seat[]).find((s) => !takenSeats.has(s));
-  if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', 'Room is full.');
+  if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
   const player: RoomPlayer = { id: randomCode(12), name, seat, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) };
   room.players.push(player);
   return player;
 }
 
 function addTestBots(room: Room): void {
-  if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', 'Room has already started.');
+  if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
   const botNames = ['ربات نیکا', 'ربات آرش', 'ربات سارا'];
   let botIndex = room.players.filter((player) => player.isBot).length;
   while (room.players.length < 4) {
@@ -386,7 +389,7 @@ function viewFor(room: Room, playerId?: string) {
 
 function requireRoom(roomId: string): Room {
   const room = rooms.get(roomId);
-  if (!room) throw new HttpError(404, 'ROOM_NOT_FOUND', 'Room was not found.');
+  if (!room) throw new HttpError(404, 'ROOM_NOT_FOUND', localizeErrorCode('ROOM_NOT_FOUND'));
   return room;
 }
 
@@ -396,11 +399,13 @@ function randomCode(length: number) {
 }
 
 function normalizeError(error: unknown) {
-  if (error instanceof z.ZodError) return { ok: false, error: 'VALIDATION_ERROR', details: error.flatten() };
-  if (error instanceof HokmError) return { ok: false, error: error.code, message: error.message };
-  if (error instanceof HttpError) return { ok: false, error: error.code, message: error.message };
+  if (error instanceof z.ZodError) {
+    return { ok: false as const, ...errorBody('VALIDATION_ERROR'), details: error.flatten() };
+  }
+  if (error instanceof HokmError) return { ok: false as const, ...errorBody(error.code, error.message) };
+  if (error instanceof HttpError) return { ok: false as const, ...errorBody(error.code, error.message) };
   console.error(error);
-  return { ok: false, error: 'INTERNAL_SERVER_ERROR' };
+  return { ok: false as const, ...errorBody('INTERNAL_SERVER_ERROR') };
 }
 
 class HttpError extends Error {

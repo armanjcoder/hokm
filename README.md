@@ -43,3 +43,38 @@ npm run dev        # اجرای dev همه اپ‌ها
 ## معماری
 
 جزئیات معماری و نقشه راه در [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) آمده است.
+
+## گرفتن آخرین تغییرات روی لپتاپ (Workflow ثابت)
+
+بعد از merge شدن هر PR، فقط این چند دستور را در PowerShell بزنید:
+
+```powershell
+cd C:\Users\arman\Desktop\hokm
+git pull origin main
+npm install
+npm run build
+npm run start -w @hokm/api
+```
+
+نکته: فایل `.npmrc` در ریشه پروژه مقدار `package-lock=false` دارد، بنابراین `npm install`
+دیگر `package-lock.json` را بازنویسی نمی‌کند و `git pull` روی این فایل conflict نمی‌دهد.
+
+اگر به هر دلیل باز هم پیام زیر را دیدید:
+
+```text
+error: Your local changes to the following files would be overwritten by merge: package-lock.json
+```
+
+یک بار این را بزنید و دوباره pull کنید:
+
+```powershell
+git restore package-lock.json
+git pull origin main
+```
+
+## پیام‌های خطا
+
+کدهای خطا (مثل `ROOM_NOT_FOUND`) انگلیسی می‌مانند چون قرارداد ماشینی بین API و Mini App هستند،
+اما هر پیامی که به بازیکن نمایش داده می‌شود فارسی است. ترجمه‌ها در
+[`apps/api/src/messages.ts`](apps/api/src/messages.ts) نگهداری می‌شوند و Mini App هم اگر پیام
+سرور فارسی نباشد، متن فارسی جایگزین خودش را نشان می‌دهد.

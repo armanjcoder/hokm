@@ -74,7 +74,7 @@ function App() {
           setToast('میز قبلی پیدا نشد؛ احتمالاً قبل از فعال شدن ذخیره‌سازی ساخته شده یا دیتابیس پاک شده. یک میز جدید بساز.');
           return;
         }
-        setToast('ارتباط با میز برقرار نشد. بک‌اند را روشن و آدرس API را چک کن.');
+        setToast(userMessage(response, 'ارتباط با میز برقرار نشد. بک‌اند را روشن و آدرس API را چک کن.'));
       }
     });
     socket.on('room:update', (nextRoom: RoomView) => setRoom(nextRoom));
@@ -103,8 +103,10 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hostName: name, telegramId: tgUser?.id }),
       });
-      const nextRoom = await response.json();
-      if (!response.ok) throw new Error(nextRoom.error ?? 'CREATE_FAILED');
+      const nextRoom = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new HokmRequestError(nextRoom?.error ?? 'CREATE_FAILED', userMessage(nextRoom, 'ساخت میز انجام نشد. بک‌اند یا آدرس API را چک کن.'));
+      }
       const player = nextRoom.players[0];
       const nextSession = { roomId: nextRoom.id, playerId: player.id, apiUrl };
       saveSession(nextSession);
@@ -112,7 +114,7 @@ function App() {
       setRoom(nextRoom);
       setToast('میز ساخته شد؛ کد یا لینک رو برای دوستات بفرست.');
     } catch (error) {
-      setToast('ساخت میز انجام نشد. بک‌اند یا آدرس API را چک کن.');
+      setToast(error instanceof HokmRequestError ? error.message : 'ساخت میز انجام نشد. بک‌اند یا آدرس API را چک کن.');
     } finally {
       setLoading(false);
     }
@@ -138,24 +140,24 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, telegramId: tgUser?.id }),
       });
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        const error = new Error(data.message ?? data.error ?? 'JOIN_FAILED');
-        error.name = data.error ?? 'JOIN_FAILED';
-        throw error;
+        throw new HokmRequestError(data?.error ?? 'JOIN_FAILED', userMessage(data, 'اتصال به میز انجام نشد. آدرس API یا لینک میز را چک کن.'));
       }
       const nextSession = { roomId: data.room.id, playerId: data.player.id, apiUrl: targetApiUrl };
       saveSession(nextSession);
       setSession(nextSession);
       setRoom(data.room);
     } catch (error) {
-      if (error instanceof Error && error.name === 'ROOM_NOT_FOUND') {
+      if (error instanceof HokmRequestError && error.code === 'ROOM_NOT_FOUND') {
         clearSession();
         setSession(null);
         setRoom(null);
         setToast('این میز روی سرور پیدا نشد. احتمالاً لینک قدیمی است یا بک‌اند بعد از ساخت میز ری‌استارت شده. لطفاً در ربات /newgame بزن و لینک جدید را باز کن.');
+      } else if (error instanceof HokmRequestError) {
+        setToast(error.message);
       } else {
-        setToast(`اتصال به میز انجام نشد: ${error instanceof Error ? error.message : 'آدرس API یا لینک میز را چک کن.'}`);
+        setToast('اتصال به میز انجام نشد. اینترنت، آدرس API یا لینک میز را چک کن.');
       }
     } finally {
       setLoading(false);
@@ -164,14 +166,24 @@ function App() {
 
   async function startGame() {
     if (!room) return;
-    const response = await fetch(`${apiUrl}/rooms/${room.id}/start`, { method: 'POST' });
-    if (!response.ok) setToast('برای شروع باید هر ۴ بازیکن داخل میز باشند.');
+    try {
+      const response = await fetch(`${apiUrl}/rooms/${room.id}/start`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) setToast(userMessage(data, 'برای شروع باید هر ۴ بازیکن داخل میز باشند.'));
+    } catch {
+      setToast('ارتباط با سرور برقرار نشد. بک‌اند و آدرس API را چک کن.');
+    }
   }
 
   async function addTestBots() {
     if (!room) return;
-    const response = await fetch(`${apiUrl}/rooms/${room.id}/add-bots`, { method: 'POST' });
-    if (!response.ok) setToast('اضافه کردن ربات‌های تست انجام نشد.');
+    try {
+      const response = await fetch(`${apiUrl}/rooms/${room.id}/add-bots`, { method: 'POST' });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) setToast(userMessage(data, 'اضافه کردن ربات‌های تست انجام نشد.'));
+    } catch {
+      setToast('ارتباط با سرور برقرار نشد. بک‌اند و آدرس API را چک کن.');
+    }
   }
 
   function chooseSuit(suit: Suit) {
@@ -190,7 +202,7 @@ function App() {
   }
 
   function ackToast(response: any) {
-    if (response?.ok === false) setToast(response.message ?? response.error ?? 'حرکت نامعتبر بود.');
+    if (response?.ok === false) setToast(userMessage(response, 'این حرکت انجام نشد. دوباره تلاش کن.'));
   }
 
   if (!room || !session) {
@@ -348,6 +360,22 @@ function PlayingCard({ card, disabled, compact, onClick }: { card: Card; disable
 
 function suitSymbol(suit: Suit) {
   return suits.find((s) => s.id === suit)?.symbol ?? '؟';
+}
+
+class HokmRequestError extends Error {
+  constructor(public code: string, message: string) {
+    super(message);
+    this.name = 'HokmRequestError';
+  }
+}
+
+/**
+ * Only shows a server message when it is actually Persian; otherwise falls back
+ * to our own Persian text so raw English codes never reach the player.
+ */
+function userMessage(payload: any, fallback: string): string {
+  const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
+  return message && /[\u0600-\u06FF]/.test(message) ? message : fallback;
 }
 
 function defaultApiUrl(): string {
