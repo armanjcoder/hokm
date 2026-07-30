@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { io, type Socket } from 'socket.io-client';
 import type { Card, PublicGameView, Suit } from '@hokm/game-engine';
@@ -46,6 +46,7 @@ function App() {
   const [joinCode, setJoinCode] = useState(new URLSearchParams(location.search).get('room') ?? '');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState('');
+  const autoJoinAttempted = useRef(false);
 
   const socket = useMemo<Socket>(() => io(apiUrl, { autoConnect: false }), [apiUrl]);
   const me = room?.players.find((p) => p.id === session?.playerId);
@@ -117,6 +118,13 @@ function App() {
     }
   }
 
+  useEffect(() => {
+    if (!session && joinCode && !autoJoinAttempted.current) {
+      autoJoinAttempted.current = true;
+      void joinRoom();
+    }
+  }, []);
+
   async function joinRoom() {
     const parsed = parseJoinInput(joinCode);
     if (parsed.apiUrl) updateApiUrl(parsed.apiUrl);
@@ -131,13 +139,24 @@ function App() {
         body: JSON.stringify({ name, telegramId: tgUser?.id }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error ?? 'JOIN_FAILED');
+      if (!response.ok) {
+        const error = new Error(data.message ?? data.error ?? 'JOIN_FAILED');
+        error.name = data.error ?? 'JOIN_FAILED';
+        throw error;
+      }
       const nextSession = { roomId: data.room.id, playerId: data.player.id, apiUrl: targetApiUrl };
       saveSession(nextSession);
       setSession(nextSession);
       setRoom(data.room);
     } catch (error) {
-      setToast('اتصال به میز انجام نشد. لینک میز یا آدرس API رو چک کن.');
+      if (error instanceof Error && error.name === 'ROOM_NOT_FOUND') {
+        clearSession();
+        setSession(null);
+        setRoom(null);
+        setToast('این میز روی سرور پیدا نشد. احتمالاً لینک قدیمی است یا بک‌اند بعد از ساخت میز ری‌استارت شده. لطفاً در ربات /newgame بزن و لینک جدید را باز کن.');
+      } else {
+        setToast(`اتصال به میز انجام نشد: ${error instanceof Error ? error.message : 'آدرس API یا لینک میز را چک کن.'}`);
+      }
     } finally {
       setLoading(false);
     }
