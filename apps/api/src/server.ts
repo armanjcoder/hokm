@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { Bot, InlineKeyboard } from 'grammy';
 import { Server } from 'socket.io';
 import { z } from 'zod';
+import { SqliteRoomStore } from './storage.js';
 import {
   chooseTrump,
   continueToNextHand,
@@ -30,6 +31,7 @@ const defaultPublicUrl = `http://localhost:${port}`;
 const webAppUrl = process.env.WEB_APP_URL ?? defaultPublicUrl;
 const publicApiUrl = process.env.PUBLIC_API_URL ?? webAppUrl;
 const corsOrigins = parseCorsOrigins(process.env.CORS_ORIGIN ?? webAppUrl);
+const roomStore = await SqliteRoomStore.open(process.env.DB_PATH ?? './data/hokm.sqlite');
 
 interface RoomPlayer {
   id: string;
@@ -49,7 +51,9 @@ interface Room {
   game?: HokmGameState;
 }
 
-const rooms = new Map<string, Room>();
+const rooms = new Map<string, Room>(
+  roomStore.loadRooms<Room>().map((room) => [room.id, normalizeLoadedRoom(room)]),
+);
 
 const app = express();
 app.use(cors({ origin: corsOriginHandler, credentials: true }));
@@ -68,6 +72,7 @@ app.get('/rooms/:roomId', (req, res) => {
 app.post('/rooms', (req, res) => {
   const body = createRoomSchema.parse(req.body);
   const room = createRoom(body.hostName, body.telegramId);
+  persistRoom(room);
   res.status(201).json(sanitizeRoom(room));
 });
 
@@ -75,6 +80,7 @@ app.post('/rooms/:roomId/join', (req, res) => {
   const room = requireRoom(req.params.roomId);
   const body = joinRoomSchema.parse(req.body);
   const player = joinRoom(room, body.name, body.telegramId);
+  persistRoom(room);
   void emitRoom(room);
   res.json({ room: sanitizeRoom(room), player });
 });
@@ -82,6 +88,7 @@ app.post('/rooms/:roomId/join', (req, res) => {
 app.post('/rooms/:roomId/add-bots', (req, res) => {
   const room = requireRoom(req.params.roomId);
   addTestBots(room);
+  persistRoom(room);
   void emitRoom(room);
   return res.json(sanitizeRoom(room));
 });
@@ -94,6 +101,7 @@ app.post('/rooms/:roomId/start', (req, res) => {
   room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })), { id: room.id, targetScore: 7 });
   room.status = 'playing';
   autoAdvanceBots(room);
+  persistRoom(room);
   void emitRoom(room);
   return res.json(sanitizeRoom(room));
 });
@@ -146,6 +154,7 @@ io.on('connection', (socket) => {
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
       room.game = chooseTrump(room.game, playerId, suit);
       autoAdvanceBots(room);
+      persistRoom(room);
       ack?.({ ok: true });
       void emitRoom(room);
     } catch (error) {
@@ -161,6 +170,7 @@ io.on('connection', (socket) => {
       room.game = playCard(room.game, playerId, cardId);
       autoAdvanceBots(room);
       if (room.game.phase === 'game_complete') room.status = 'finished';
+      persistRoom(room);
       ack?.({ ok: true });
       void emitRoom(room);
     } catch (error) {
@@ -175,6 +185,7 @@ io.on('connection', (socket) => {
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', 'Game is not started.');
       room.game = continueToNextHand(room.game);
       autoAdvanceBots(room);
+      persistRoom(room);
       ack?.({ ok: true });
       void emitRoom(room);
     } catch (error) {
@@ -220,6 +231,20 @@ async function startTelegramBot() {
   bot.catch((err) => console.error('Telegram bot error:', err));
   await bot.api.deleteWebhook({ drop_pending_updates: true });
   await bot.start();
+}
+
+function persistRoom(room: Room): void {
+  roomStore.saveRoom(room);
+}
+
+function normalizeLoadedRoom(room: Room): Room {
+  return {
+    ...room,
+    players: room.players.map((player) => ({
+      ...player,
+      connected: player.isBot ? true : false,
+    })),
+  };
 }
 
 function createRoom(hostName: string, telegramId?: number): Room {
