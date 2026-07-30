@@ -87,3 +87,4 @@ label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
   .card { flex-basis: 72px; height: 106px; }
   .trump-picker { max-width: 540px; margin: auto; }
 }
+.full-width { width: 100%; }

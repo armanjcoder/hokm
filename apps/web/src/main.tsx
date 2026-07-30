@@ -60,8 +60,21 @@ function App() {
     if (!session) return;
     socket.connect();
     socket.emit('room:join', session, (response: any) => {
-      if (response?.ok && response.room) setRoom(response.room);
-      if (response?.ok === false) setToast('ارتباط با میز برقرار نشد. بک‌اند را روشن و آدرس API را چک کن.');
+      if (response?.ok && response.room) {
+        setRoom(response.room);
+        return;
+      }
+      if (response?.ok === false) {
+        if (response.error === 'ROOM_NOT_FOUND') {
+          clearSession();
+          setSession(null);
+          setRoom(null);
+          setJoinCode('');
+          setToast('میز قبلی پیدا نشد؛ احتمالاً قبل از فعال شدن ذخیره‌سازی ساخته شده یا دیتابیس پاک شده. یک میز جدید بساز.');
+          return;
+        }
+        setToast('ارتباط با میز برقرار نشد. بک‌اند را روشن و آدرس API را چک کن.');
+      }
     });
     socket.on('room:update', (nextRoom: RoomView) => setRoom(nextRoom));
     return () => {
@@ -174,6 +187,7 @@ function App() {
         createRoom={createRoom}
         joinRoom={joinRoom}
         toast={toast}
+        clearSavedSession={() => { clearSession(); setSession(null); setRoom(null); setToast('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.'); }}
       />
     );
   }
@@ -199,7 +213,7 @@ function App() {
 
 function Landing(props: {
   name: string; setName: (name: string) => void; joinCode: string; setJoinCode: (code: string) => void;
-  apiUrl: string; setApiUrl: (url: string) => void; loading: boolean; createRoom: () => void; joinRoom: () => void; toast: string;
+  apiUrl: string; setApiUrl: (url: string) => void; loading: boolean; createRoom: () => void; joinRoom: () => void; toast: string; clearSavedSession: () => void;
 }) {
   return (
     <main className="landing">
@@ -217,6 +231,7 @@ function Landing(props: {
         </details>
         <div className="actions-grid">
           <button className="primary" disabled={props.loading} onClick={props.createRoom}>ساخت میز جدید</button>
+          <button className="ghost full-width" type="button" onClick={props.clearSavedSession}>پاک کردن نشست قبلی</button>
           <div className="join-box">
             <input placeholder="کد یا لینک میز" value={props.joinCode} onChange={(e) => props.setJoinCode(e.target.value)} />
             <button onClick={props.joinRoom} disabled={props.loading}>ورود</button>
@@ -353,6 +368,9 @@ function parseJoinInput(input: string): { roomId: string; apiUrl?: string } {
 function saveSession(session: StoredSession) {
   localStorage.setItem('hokm.session', JSON.stringify(session));
   localStorage.setItem('hokm.apiUrl', session.apiUrl);
+}
+function clearSession() {
+  localStorage.removeItem('hokm.session');
 }
 function readSession(apiUrl: string): StoredSession | null {
   try {
