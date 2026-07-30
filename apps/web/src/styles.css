@@ -97,3 +97,14 @@ label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
   .trump-picker { max-width: 540px; margin: auto; }
 }
 .full-width { width: 100%; }
+
+/* Resume previous table */
+.resume-card { width: 100%; max-width: 460px; margin-bottom: 16px; padding: 20px; border-radius: 28px; background: linear-gradient(145deg, rgba(0,212,170,.16), rgba(0,212,170,.05)); border: 1px solid rgba(0,212,170,.32); }
+.resume-card h2 { margin: 0 0 6px; font-size: 19px; }
+.resume-card p { margin: 0 0 12px; font-size: 14px; color: #b9b9c9; line-height: 1.7; }
+.resume-actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.room-id { display: block; direction: ltr; text-align: center; font-size: 13px; letter-spacing: .5px; padding: 9px 12px; margin-bottom: 12px; border-radius: 14px; background: rgba(0,0,0,.28); color: #8fe8d5; word-break: break-all; }
+.resume-screen { text-align: center; }
+.resume-screen h1 { font-size: 21px; margin: 14px 0 8px; }
+.spinner { width: 42px; height: 42px; margin: 8px auto 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.14); border-top-color: #00d4aa; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
