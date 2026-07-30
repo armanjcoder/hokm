@@ -33,7 +33,7 @@ interface RoomView {
   players: RoomPlayer[];
   game?: PublicGameView;
 }
-interface StoredSession { roomId: string; playerId: string; apiUrl: string }
+interface StoredSession { roomId: string; playerId: string; apiUrl: string; token?: string }
 
 function App() {
   const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -60,12 +60,24 @@ function App() {
   useEffect(() => {
     if (!session) return;
     socket.connect();
-    socket.emit('room:join', session, (response: any) => {
+    socket.emit('room:join', socketPayload(session), (response: any) => {
       if (response?.ok && response.room) {
         setRoom(response.room);
+        if (typeof response.token === 'string' && response.token !== session.token) {
+          const upgraded = { ...session, token: response.token };
+          saveSession(upgraded);
+          setSession(upgraded);
+        }
         return;
       }
       if (response?.ok === false) {
+        if (response.error === 'INVALID_SESSION' || response.error === 'PLAYER_NOT_FOUND') {
+          clearSession();
+          setSession(null);
+          setRoom(null);
+          setToast('نشست تو دیگر معتبر نیست. لطفاً دوباره وارد میز شو یا میز جدید بساز.');
+          return;
+        }
         if (response.error === 'ROOM_NOT_FOUND') {
           clearSession();
           setSession(null);
@@ -108,7 +120,7 @@ function App() {
         throw new HokmRequestError(nextRoom?.error ?? 'CREATE_FAILED', userMessage(nextRoom, 'ساخت میز انجام نشد. بک‌اند یا آدرس API را چک کن.'));
       }
       const player = nextRoom.players[0];
-      const nextSession = { roomId: nextRoom.id, playerId: player.id, apiUrl };
+      const nextSession: StoredSession = { roomId: nextRoom.id, playerId: player.id, apiUrl, token: nextRoom.token };
       saveSession(nextSession);
       setSession(nextSession);
       setRoom(nextRoom);
@@ -144,7 +156,7 @@ function App() {
       if (!response.ok) {
         throw new HokmRequestError(data?.error ?? 'JOIN_FAILED', userMessage(data, 'اتصال به میز انجام نشد. آدرس API یا لینک میز را چک کن.'));
       }
-      const nextSession = { roomId: data.room.id, playerId: data.player.id, apiUrl: targetApiUrl };
+      const nextSession: StoredSession = { roomId: data.room.id, playerId: data.player.id, apiUrl: targetApiUrl, token: data.token ?? data.player?.token };
       saveSession(nextSession);
       setSession(nextSession);
       setRoom(data.room);
@@ -188,17 +200,17 @@ function App() {
 
   function chooseSuit(suit: Suit) {
     if (!session) return;
-    socket.emit('game:choose_trump', { ...session, suit }, ackToast);
+    socket.emit('game:choose_trump', { ...socketPayload(session), suit }, ackToast);
   }
 
   function play(card: Card) {
     if (!session || !game?.validCardIds.includes(card.id)) return;
-    socket.emit('game:play_card', { ...session, cardId: card.id }, ackToast);
+    socket.emit('game:play_card', { ...socketPayload(session), cardId: card.id }, ackToast);
   }
 
   function nextHand() {
     if (!session) return;
-    socket.emit('game:next_hand', { roomId: session.roomId }, ackToast);
+    socket.emit('game:next_hand', socketPayload(session), ackToast);
   }
 
   function ackToast(response: any) {
@@ -360,6 +372,15 @@ function PlayingCard({ card, disabled, compact, onClick }: { card: Card; disable
 
 function suitSymbol(suit: Suit) {
   return suits.find((s) => s.id === suit)?.symbol ?? '؟';
+}
+
+/** Only the fields the server expects; never leaks apiUrl into the payload. */
+function socketPayload(session: StoredSession) {
+  return {
+    roomId: session.roomId,
+    playerId: session.playerId,
+    ...(session.token ? { token: session.token } : {}),
+  };
 }
 
 class HokmRequestError extends Error {

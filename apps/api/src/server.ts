@@ -10,6 +10,7 @@ import { Server } from 'socket.io';
 import { z } from 'zod';
 import { SqliteRoomStore } from './storage.js';
 import { errorBody, localizeErrorCode } from './messages.js';
+import { createPlayerToken, verifyPlayerSession, withoutToken } from './session.js';
 import {
   chooseTrump,
   continueToNextHand,
@@ -40,6 +41,8 @@ const roomStore = await SqliteRoomStore.open(dbPath);
 
 interface RoomPlayer {
   id: string;
+  /** Secret session token. Never leaves the server except to its own owner. */
+  token?: string;
   name: string;
   telegramId?: number;
   seat: Seat;
@@ -79,7 +82,8 @@ app.post('/rooms', (req, res) => {
   const body = createRoomSchema.parse(req.body);
   const room = createRoom(body.hostName, body.telegramId);
   persistRoom(room);
-  res.status(201).json(sanitizeRoom(room));
+  const host = room.players[0];
+  res.status(201).json({ ...sanitizeRoom(room), token: host?.token });
 });
 
 app.post('/rooms/:roomId/join', (req, res) => {
@@ -88,7 +92,7 @@ app.post('/rooms/:roomId/join', (req, res) => {
   const player = joinRoom(room, body.name, body.telegramId);
   persistRoom(room);
   void emitRoom(room);
-  res.json({ room: sanitizeRoom(room), player });
+  res.json({ room: sanitizeRoom(room), player, token: player.token });
 });
 
 app.post('/rooms/:roomId/add-bots', (req, res) => {
@@ -147,14 +151,16 @@ const io = new Server(httpServer, {
 io.on('connection', (socket) => {
   socket.on('room:join', (payload: unknown, ack?: (response: unknown) => void) => {
     try {
-      const { roomId, playerId } = socketJoinSchema.parse(payload);
+      const { roomId, playerId, token } = socketJoinSchema.parse(payload);
       const room = requireRoom(roomId);
+      const adoptedToken = requireSession(room, playerId, token);
       socket.join(roomId);
       socket.data.roomId = roomId;
       socket.data.playerId = playerId;
       const player = room.players.find((p) => p.id === playerId);
       if (player) player.connected = true;
-      ack?.({ ok: true, room: viewFor(room, playerId) });
+      persistRoom(room);
+      ack?.({ ok: true, room: viewFor(room, playerId), ...(adoptedToken ? { token: adoptedToken } : {}) });
       void emitRoom(room);
     } catch (error) {
       ack?.(normalizeError(error));
@@ -163,8 +169,9 @@ io.on('connection', (socket) => {
 
   socket.on('game:choose_trump', (payload: unknown, ack?: (response: unknown) => void) => {
     try {
-      const { roomId, playerId, suit } = chooseTrumpSchema.parse(payload);
+      const { roomId, playerId, suit, token } = chooseTrumpSchema.parse(payload);
       const room = requireRoom(roomId);
+      requireSession(room, playerId, token);
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
       room.game = chooseTrump(room.game, playerId, suit);
       autoAdvanceBots(room);
@@ -178,8 +185,9 @@ io.on('connection', (socket) => {
 
   socket.on('game:play_card', (payload: unknown, ack?: (response: unknown) => void) => {
     try {
-      const { roomId, playerId, cardId } = playCardSchema.parse(payload);
+      const { roomId, playerId, cardId, token } = playCardSchema.parse(payload);
       const room = requireRoom(roomId);
+      requireSession(room, playerId, token);
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
       room.game = playCard(room.game, playerId, cardId);
       autoAdvanceBots(room);
@@ -194,8 +202,9 @@ io.on('connection', (socket) => {
 
   socket.on('game:next_hand', (payload: unknown, ack?: (response: unknown) => void) => {
     try {
-      const { roomId } = nextHandSchema.parse(payload);
+      const { roomId, playerId, token } = nextHandSchema.parse(payload);
       const room = requireRoom(roomId);
+      requireSession(room, playerId, token);
       if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
       room.game = continueToNextHand(room.game);
       autoAdvanceBots(room);
@@ -268,7 +277,7 @@ function createRoom(hostName: string, telegramId?: number): Room {
     code: randomCode(5),
     status: 'lobby',
     createdAt: new Date().toISOString(),
-    players: [{ id: randomCode(12), name: hostName, seat: 0, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) }],
+    players: [{ id: randomCode(12), token: createPlayerToken(), name: hostName, seat: 0, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) }],
   };
   rooms.set(room.id, room);
   persistRoom(room);
@@ -283,7 +292,7 @@ function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
   const takenSeats = new Set(room.players.map((p) => p.seat));
   const seat = ([0, 1, 2, 3] as Seat[]).find((s) => !takenSeats.has(s));
   if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
-  const player: RoomPlayer = { id: randomCode(12), name, seat, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) };
+  const player: RoomPlayer = { id: randomCode(12), token: createPlayerToken(), name, seat, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) };
   room.players.push(player);
   return player;
 }
@@ -360,6 +369,7 @@ async function emitRoom(room: Room) {
 function sanitizeRoom(room: Room) {
   return {
     ...room,
+    players: room.players.map(withoutToken),
     game: room.game
       ? {
           phase: room.game.phase,
@@ -385,6 +395,20 @@ function viewFor(room: Room, playerId?: string) {
       validCardIds: getValidCards(room.game, playerId).map((card: Card) => card.id),
     },
   };
+}
+
+/**
+ * Verifies the caller owns the seat they claim.
+ * Returns a freshly adopted token when the seat came from a pre-token snapshot.
+ */
+function requireSession(room: Room, playerId: string, token: string | undefined): string | undefined {
+  const result = verifyPlayerSession(room.players, playerId, token);
+  if (!result.ok) {
+    const status = result.code === 'PLAYER_NOT_FOUND' ? 404 : 403;
+    throw new HttpError(status, result.code, localizeErrorCode(result.code));
+  }
+  if (result.adoptedToken) persistRoom(room);
+  return result.adoptedToken;
 }
 
 function requireRoom(roomId: string): Room {
@@ -447,8 +471,8 @@ function corsOriginHandler(origin: string | undefined, callback: (err: Error | n
 
 const createRoomSchema = z.object({ hostName: z.string().min(1).max(40).default('بازیکن'), telegramId: z.number().optional() });
 const joinRoomSchema = z.object({ name: z.string().min(1).max(40), telegramId: z.number().optional() });
-const socketJoinSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1) });
+const socketJoinSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional() });
 const suitSchema: z.ZodType<Suit> = z.enum(['spades', 'hearts', 'diamonds', 'clubs']);
-const chooseTrumpSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), suit: suitSchema });
-const playCardSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), cardId: z.string().min(1) });
-const nextHandSchema = z.object({ roomId: z.string().min(1) });
+const chooseTrumpSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional(), suit: suitSchema });
+const playCardSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional(), cardId: z.string().min(1) });
+const nextHandSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional() });

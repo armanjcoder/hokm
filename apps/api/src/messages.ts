@@ -29,6 +29,7 @@ export const ERROR_MESSAGES_FA: Record<string, string> = {
   NO_HAND_WINNER: 'هنوز برنده این راند مشخص نشده است.',
   EMPTY_TRICK: 'دست خالی قابل بررسی نیست.',
   INVALID_DEAL: 'پخش کارت‌ها نامعتبر است؛ تعداد کارت‌ها درست نیست.',
+  INVALID_SESSION: 'نشست تو معتبر نیست. لطفاً دوباره وارد میز شو.',
   PLAYER_NOT_FOUND: 'بازیکن در این میز پیدا نشد.',
   SEAT_NOT_FOUND: 'این صندلی در میز پیدا نشد.',
   NOT_FOUND: 'آدرس درخواستی روی سرور پیدا نشد.',
