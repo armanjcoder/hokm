@@ -343,16 +343,28 @@ Test-NetConnection api.trycloudflare.com -Port 443
 ssh -V
 ```
 
-بعد:
+بعد این دستور را بزنید:
 
 ```powershell
-ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R0:localhost:4000 free@a.pinggy.io
+ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 0:127.0.0.1:4000 free@a.pinggy.io
 ```
 
-اگر پرسید ادامه می‌دهید، `yes` بزنید. خروجی یک لینک HTTPS شبیه این می‌دهد:
+اگر پرسید ادامه می‌دهید، `yes` بزنید. اگر از شما password خواست، پسورد نزنید؛ `Ctrl + C` بزنید و یک SSH key بسازید:
+
+```powershell
+ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\id_ed25519" -N ""
+```
+
+اگر گفت فایل از قبل وجود دارد، `n` بزنید تا کلید قبلی overwrite نشود. سپس دوباره Pinggy را با public-key اجرا کنید:
+
+```powershell
+ssh -p 443 -i "$env:USERPROFILE\.ssh\id_ed25519" -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 0:127.0.0.1:4000 free@a.pinggy.io
+```
+
+خروجی باید یک لینک HTTPS شبیه این بدهد:
 
 ```text
-https://something.a.pinggy.link
+https://something.a.free.pinggy.link
 ```
 
 این لینک را دقیقا مثل لینک Cloudflare در `.env` برای `WEB_APP_URL`، `PUBLIC_API_URL` و `CORS_ORIGIN` بگذارید.
