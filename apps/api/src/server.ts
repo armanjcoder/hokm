@@ -200,6 +200,10 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('disconnect', () => {
+    void handleSocketDisconnect(socket.id, socket.data.roomId, socket.data.playerId);
+  });
+
   socket.on('game:next_hand', (payload: unknown, ack?: (response: unknown) => void) => {
     try {
       const { roomId, playerId, token } = nextHandSchema.parse(payload);
@@ -254,6 +258,31 @@ async function startTelegramBot() {
   bot.catch((err) => console.error('Telegram bot error:', err));
   await bot.api.deleteWebhook({ drop_pending_updates: true });
   await bot.start();
+}
+
+/**
+ * Marks a player offline when their last socket goes away.
+ *
+ * A reconnect can briefly overlap with the dying socket, and a player may also
+ * have several tabs open, so we only flip `connected` to false when no other
+ * live socket claims the same seat.
+ */
+async function handleSocketDisconnect(socketId: string, roomId: unknown, playerId: unknown): Promise<void> {
+  if (typeof roomId !== 'string' || typeof playerId !== 'string') return;
+  const room = rooms.get(roomId);
+  if (!room) return;
+  const player = room.players.find((candidate) => candidate.id === playerId);
+  if (!player || player.isBot) return;
+
+  const sockets = await io.in(roomId).fetchSockets();
+  const stillConnected = sockets.some(
+    (other) => other.id !== socketId && other.data.playerId === playerId,
+  );
+  if (stillConnected || player.connected === false) return;
+
+  player.connected = false;
+  persistRoom(room);
+  await emitRoom(room);
 }
 
 function persistRoom(room: Room): void {

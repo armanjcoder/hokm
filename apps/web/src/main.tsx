@@ -34,6 +34,7 @@ interface RoomView {
   game?: PublicGameView;
 }
 interface StoredSession { roomId: string; playerId: string; apiUrl: string; token?: string }
+type ConnectionStatus = 'connecting' | 'connected' | 'offline';
 
 function App() {
   const tgUser = window.Telegram?.WebApp?.initDataUnsafe?.user;
@@ -46,9 +47,23 @@ function App() {
   const [joinCode, setJoinCode] = useState(new URLSearchParams(location.search).get('room') ?? '');
   const [loading, setLoading] = useState(false);
   const [toast, setToast] = useState('');
+  const [connection, setConnection] = useState<ConnectionStatus>('connecting');
   const autoJoinAttempted = useRef(false);
 
-  const socket = useMemo<Socket>(() => io(apiUrl, { autoConnect: false }), [apiUrl]);
+  const socket = useMemo<Socket>(
+    () =>
+      io(apiUrl, {
+        autoConnect: false,
+        reconnection: true,
+        reconnectionAttempts: Infinity,
+        reconnectionDelay: 500,
+        reconnectionDelayMax: 5000,
+        // Spreads retries out so every client does not hammer the tunnel at once.
+        randomizationFactor: 0.5,
+        timeout: 10000,
+      }),
+    [apiUrl],
+  );
   const me = room?.players.find((p) => p.id === session?.playerId);
   const game = room?.game;
 
@@ -59,39 +74,63 @@ function App() {
 
   useEffect(() => {
     if (!session) return;
-    socket.connect();
-    socket.emit('room:join', socketPayload(session), (response: any) => {
-      if (response?.ok && response.room) {
-        setRoom(response.room);
-        if (typeof response.token === 'string' && response.token !== session.token) {
-          const upgraded = { ...session, token: response.token };
-          saveSession(upgraded);
-          setSession(upgraded);
-        }
-        return;
-      }
-      if (response?.ok === false) {
-        if (response.error === 'INVALID_SESSION' || response.error === 'PLAYER_NOT_FOUND') {
-          clearSession();
-          setSession(null);
-          setRoom(null);
-          setToast('نشست تو دیگر معتبر نیست. لطفاً دوباره وارد میز شو یا میز جدید بساز.');
+
+    // Re-joining must happen on *every* connect, not just the first one:
+    // after a reconnect the socket is a brand new one and is no longer a member
+    // of the Socket.IO room, so it would silently stop receiving room:update.
+    const joinRoomOverSocket = () => {
+      setConnection('connected');
+      socket.emit('room:join', socketPayload(session), (response: any) => {
+        if (response?.ok && response.room) {
+          setRoom(response.room);
+          if (typeof response.token === 'string' && response.token !== session.token) {
+            const upgraded = { ...session, token: response.token };
+            saveSession(upgraded);
+            setSession(upgraded);
+          }
           return;
         }
-        if (response.error === 'ROOM_NOT_FOUND') {
-          clearSession();
-          setSession(null);
-          setRoom(null);
-          setJoinCode('');
-          setToast('میز قبلی پیدا نشد؛ احتمالاً قبل از فعال شدن ذخیره‌سازی ساخته شده یا دیتابیس پاک شده. یک میز جدید بساز.');
-          return;
+        if (response?.ok === false) {
+          if (response.error === 'INVALID_SESSION' || response.error === 'PLAYER_NOT_FOUND') {
+            clearSession();
+            setSession(null);
+            setRoom(null);
+            setToast('نشست تو دیگر معتبر نیست. لطفاً دوباره وارد میز شو یا میز جدید بساز.');
+            return;
+          }
+          if (response.error === 'ROOM_NOT_FOUND') {
+            clearSession();
+            setSession(null);
+            setRoom(null);
+            setJoinCode('');
+            setToast('میز قبلی پیدا نشد؛ احتمالاً قبل از فعال شدن ذخیره‌سازی ساخته شده یا دیتابیس پاک شده. یک میز جدید بساز.');
+            return;
+          }
+          setToast(userMessage(response, 'ارتباط با میز برقرار نشد. بک‌اند را روشن و آدرس API را چک کن.'));
         }
-        setToast(userMessage(response, 'ارتباط با میز برقرار نشد. بک‌اند را روشن و آدرس API را چک کن.'));
-      }
-    });
-    socket.on('room:update', (nextRoom: RoomView) => setRoom(nextRoom));
+      });
+    };
+
+    const handleDisconnect = () => setConnection('offline');
+    const handleReconnectAttempt = () => setConnection('connecting');
+    const handleRoomUpdate = (nextRoom: RoomView) => setRoom(nextRoom);
+
+    socket.on('connect', joinRoomOverSocket);
+    socket.on('disconnect', handleDisconnect);
+    socket.on('connect_error', handleDisconnect);
+    socket.io.on('reconnect_attempt', handleReconnectAttempt);
+    socket.on('room:update', handleRoomUpdate);
+
+    setConnection(socket.connected ? 'connected' : 'connecting');
+    if (socket.connected) joinRoomOverSocket();
+    else socket.connect();
+
     return () => {
-      socket.off('room:update');
+      socket.off('connect', joinRoomOverSocket);
+      socket.off('disconnect', handleDisconnect);
+      socket.off('connect_error', handleDisconnect);
+      socket.io.off('reconnect_attempt', handleReconnectAttempt);
+      socket.off('room:update', handleRoomUpdate);
       socket.disconnect();
     };
   }, [session, socket]);
@@ -200,17 +239,27 @@ function App() {
 
   function chooseSuit(suit: Suit) {
     if (!session) return;
+    if (!requireConnection()) return;
     socket.emit('game:choose_trump', { ...socketPayload(session), suit }, ackToast);
   }
 
   function play(card: Card) {
     if (!session || !game?.validCardIds.includes(card.id)) return;
+    if (!requireConnection()) return;
     socket.emit('game:play_card', { ...socketPayload(session), cardId: card.id }, ackToast);
   }
 
   function nextHand() {
     if (!session) return;
+    if (!requireConnection()) return;
     socket.emit('game:next_hand', socketPayload(session), ackToast);
+  }
+
+  /** Blocks moves that would be silently dropped while the socket is down. */
+  function requireConnection(): boolean {
+    if (connection === 'connected') return true;
+    setToast('ارتباط با سرور قطع است. تا وصل شدن دوباره صبر کن.');
+    return false;
   }
 
   function ackToast(response: any) {
@@ -237,7 +286,7 @@ function App() {
 
   return (
     <main className="app-shell">
-      <TopBar room={room} me={me} apiUrl={apiUrl} />
+      <TopBar room={room} me={me} apiUrl={apiUrl} connection={connection} />
       {room.status === 'lobby' && <Lobby room={room} startGame={startGame} addTestBots={addTestBots} invite={() => shareRoom(room.id, apiUrl)} />}
       {room.status !== 'lobby' && game && (
         <GameTable
@@ -286,11 +335,27 @@ function Landing(props: {
   );
 }
 
-function TopBar({ room, me, apiUrl }: { room: RoomView; me: RoomPlayer | undefined; apiUrl: string }) {
+const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
+  connected: 'آنلاین',
+  connecting: 'در حال اتصال دوباره…',
+  offline: 'آفلاین',
+};
+
+function TopBar({ room, me, apiUrl, connection }: { room: RoomView; me: RoomPlayer | undefined; apiUrl: string; connection: ConnectionStatus }) {
   return (
     <header className="topbar">
       <div><strong>Hokm Club</strong><small>میز {room.code}</small></div>
-      <div className="topbar-actions"><span className="api-dot" title={apiUrl} /><div className="pill">{me ? `صندلی ${me.seat + 1}` : 'تماشاچی'}</div></div>
+      <div className="topbar-actions">
+        <span className={`api-dot ${connection}`} title={`${CONNECTION_LABELS[connection]} — ${apiUrl}`} />
+        <div className="pill">{me ? `صندلی ${me.seat + 1}` : 'تماشاچی'}</div>
+      </div>
+      {connection !== 'connected' && (
+        <div className={`connection-banner ${connection}`} role="status">
+          {connection === 'connecting'
+            ? 'ارتباط قطع شد؛ در حال اتصال دوباره به میز…'
+            : 'اتصال برقرار نیست. بک‌اند یا اینترنت را چک کن؛ خودکار دوباره تلاش می‌کنیم.'}
+        </div>
+      )}
     </header>
   );
 }
@@ -303,7 +368,14 @@ function Lobby({ room, startGame, addTestBots, invite }: { room: RoomView; start
       <div className="seat-grid">
         {[0, 1, 2, 3].map((seat) => {
           const player = room.players.find((p) => p.seat === seat);
-          return <div className="seat-card" key={seat}><span>صندلی {seat + 1}</span><strong>{player ? `${player.name}${player.isBot ? ' 🤖' : ''}` : 'در انتظار بازیکن...'}</strong></div>;
+          const offline = Boolean(player) && !player?.connected;
+          return (
+            <div className={`seat-card ${offline ? 'offline' : ''}`} key={seat}>
+              <span>صندلی {seat + 1}</span>
+              <strong>{player ? `${player.name}${player.isBot ? ' 🤖' : ''}` : 'در انتظار بازیکن...'}</strong>
+              {offline && <em className="seat-status">قطع شده</em>}
+            </div>
+          );
         })}
       </div>
       <div className="row-actions">
