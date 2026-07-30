@@ -5,7 +5,7 @@ function players() {
   return [
     { id: 'p1', token: 'token-one', name: 'آرمان' },
     { id: 'p2', token: 'token-two', name: 'نیکا' },
-    { id: 'bot_1', token: undefined, name: 'ربات', isBot: true },
+    { id: 'bot_1', name: 'ربات', isBot: true },
     { id: 'legacy', name: 'میز قدیمی' },
   ];
 }
