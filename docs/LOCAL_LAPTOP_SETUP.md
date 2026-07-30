@@ -352,10 +352,11 @@ ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 0:127.0.0.1:
 اگر پرسید ادامه می‌دهید، `yes` بزنید. اگر از شما password خواست، پسورد نزنید؛ `Ctrl + C` بزنید و یک SSH key بسازید:
 
 ```powershell
-ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\id_ed25519" -N ""
+New-Item -ItemType Directory -Force "$env:USERPROFILE\.ssh"
+ssh-keygen -t ed25519 -f "$env:USERPROFILE\.ssh\id_ed25519"
 ```
 
-اگر گفت فایل از قبل وجود دارد، `n` بزنید تا کلید قبلی overwrite نشود. سپس دوباره Pinggy را با public-key اجرا کنید:
+وقتی پرسید `Enter passphrase` فقط Enter بزنید. وقتی دوباره پرسید `Enter same passphrase again` باز هم فقط Enter بزنید. اگر گفت فایل از قبل وجود دارد، `n` بزنید تا کلید قبلی overwrite نشود. سپس دوباره Pinggy را با public-key اجرا کنید:
 
 ```powershell
 ssh -p 443 -i "$env:USERPROFILE\.ssh\id_ed25519" -o PasswordAuthentication=no -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R 0:127.0.0.1:4000 free@a.pinggy.io
