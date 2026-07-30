@@ -1,0 +1,24 @@
+{
+  "name": "hokm-platform",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Telegram bot and Mini App for playing Iranian Hokm.",
+  "type": "module",
+  "scripts": {
+    "dev": "npm run dev --workspaces --if-present",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "start:local": "npm run build && npm run start -w @hokm/api",
+    "dev:api": "npm run dev -w @hokm/api",
+    "dev:web": "npm run dev -w @hokm/web"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "engines": {
+    "node": ">=20"
+  }
+}
