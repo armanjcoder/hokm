@@ -299,9 +299,67 @@ npm run start -w @hokm/api
 
 ## خطاهای رایج
 
+### Cloudflare Tunnel لینک نمی‌دهد و `context deadline exceeded` می‌بینید
+
+این خطا معمولا مشکل پروژه نیست. یعنی برنامه `cloudflared` نتوانسته از شبکه شما به سرویس `api.trycloudflare.com` وصل شود یا جواب را به‌موقع بگیرد.
+
+اول مطمئن شوید دستور را بدون براکت و بدون Markdown می‌زنید:
+
+```bash
+cloudflared tunnel --url http://localhost:4000
+```
+
+در PowerShell اگر فایل exe اسم دیگری دارد:
+
+```powershell
+.\cloudflared-windows-amd64.exe tunnel --url http://localhost:4000
+```
+
+بعد این نسخه مقاوم‌تر را امتحان کنید:
+
+```powershell
+.\cloudflared-windows-amd64.exe tunnel --edge-ip-version 4 --protocol http2 --url http://localhost:4000
+```
+
+اگر باز هم timeout شد:
+
+1. اینترنت یا Wi‑Fi دیگری را امتحان کنید؛ مثلا hotspot موبایل.
+2. VPN را روشن کنید و دوباره دستور را بزنید.
+3. اگر VPN دارید ولی کار نمی‌کند، split tunneling را خاموش کنید تا `cloudflared` هم از VPN رد شود.
+4. فایروال/آنتی‌ویروس را چک کنید که جلوی `cloudflared.exe` را نگرفته باشد.
+5. نسخه جدید `cloudflared` را از سایت Cloudflare دانلود کنید.
+
+برای تست اتصال به Cloudflare در PowerShell:
+
+```powershell
+Test-NetConnection api.trycloudflare.com -Port 443
+```
+
+اگر `TcpTestSucceeded` برابر `False` بود، شبکه شما اتصال به Cloudflare را بسته یا دچار اختلال است.
+
+اگر Cloudflare با شبکه شما کار نکرد، می‌توانید موقتا از Pinggy استفاده کنید. اول بررسی کنید SSH نصب است:
+
+```powershell
+ssh -V
+```
+
+بعد:
+
+```powershell
+ssh -p 443 -R0:localhost:4000 a.pinggy.io
+```
+
+اگر پرسید ادامه می‌دهید، `yes` بزنید. خروجی یک لینک HTTPS شبیه این می‌دهد:
+
+```text
+https://something.a.pinggy.link
+```
+
+این لینک را دقیقا مثل لینک Cloudflare در `.env` برای `WEB_APP_URL`، `PUBLIC_API_URL` و `CORS_ORIGIN` بگذارید.
+
 ### Mini App باز نمی‌شود
 
-احتمالا Cloudflare Tunnel بسته شده یا آدرس `.env` قدیمی است.
+احتمالا Tunnel بسته شده یا آدرس `.env` قدیمی است.
 
 ### ربات جواب نمی‌دهد
 
