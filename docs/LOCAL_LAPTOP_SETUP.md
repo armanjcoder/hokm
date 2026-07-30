@@ -346,7 +346,7 @@ ssh -V
 بعد:
 
 ```powershell
-ssh -p 443 -R0:localhost:4000 a.pinggy.io
+ssh -p 443 -o StrictHostKeyChecking=no -o ServerAliveInterval=30 -R0:localhost:4000 free@a.pinggy.io
 ```
 
 اگر پرسید ادامه می‌دهید، `yes` بزنید. خروجی یک لینک HTTPS شبیه این می‌دهد:
