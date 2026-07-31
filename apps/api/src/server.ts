@@ -13,6 +13,16 @@ import { errorBody, localizeErrorCode } from './messages.js';
 import { createPlayerToken, verifyPlayerSession, withoutToken } from './session.js';
 import { telegramDisplayName, verifyInitData, type TelegramUser } from './telegram-auth.js';
 import {
+  cleanupAction,
+  evaluateReadiness,
+  hasNoHumans,
+  nextFreeSeat,
+  pickNextHost,
+  REQUIRED_PLAYERS,
+  type CleanupPolicy,
+  type RoomStatus,
+} from './room-lifecycle.js';
+import {
   chooseTrump,
   continueToNextHand,
   createGame,
@@ -42,6 +52,17 @@ const botToken = process.env.TELEGRAM_BOT_TOKEN ?? '';
 // Telegram identities are only trusted when we hold a bot token to verify them
 // with. Without one (pure local development) we fall back to guest players.
 const telegramAuthEnabled = botToken !== '' && process.env.ALLOW_UNVERIFIED_TELEGRAM !== 'true';
+const cleanupPolicy: CleanupPolicy = {
+  lobbyIdleMs: hoursToMs(process.env.ROOM_LOBBY_TTL_HOURS, 6),
+  playingIdleMs: hoursToMs(process.env.ROOM_PLAYING_TTL_HOURS, 12),
+  finishedIdleMs: hoursToMs(process.env.ROOM_FINISHED_TTL_HOURS, 24),
+};
+// Floor keeps the job cheap in production; tests may opt into a faster tick.
+const minCleanupIntervalMs = Number(process.env.ROOM_CLEANUP_MIN_INTERVAL_MS ?? 60_000);
+const cleanupIntervalMs = Math.max(
+  Number.isFinite(minCleanupIntervalMs) && minCleanupIntervalMs > 0 ? minCleanupIntervalMs : 60_000,
+  hoursToMs(process.env.ROOM_CLEANUP_INTERVAL_HOURS, 1),
+);
 const roomStore = await SqliteRoomStore.open(dbPath);
 
 interface RoomPlayer {
@@ -52,14 +73,17 @@ interface RoomPlayer {
   telegramId?: number;
   seat: Seat;
   connected: boolean;
+  ready?: boolean;
   isBot?: boolean;
 }
 
 interface Room {
   id: string;
   code: string;
-  status: 'lobby' | 'playing' | 'finished';
+  status: RoomStatus;
   createdAt: string;
+  lastActivityAt?: string;
+  hostPlayerId?: string;
   players: RoomPlayer[];
   game?: HokmGameState;
 }
@@ -102,30 +126,75 @@ app.post('/rooms/:roomId/join', (req, res) => {
   const body = joinRoomSchema.parse(req.body);
   const identity = authenticate(body.initData);
   const player = joinRoom(room, identity.name ?? body.name, identity.telegramId);
+  maybeStartGame(room);
   persistRoom(room);
   void emitRoom(room);
   res.json({ room: sanitizeRoom(room), player, token: player.token });
 });
 
-app.post('/rooms/:roomId/add-bots', (req, res) => {
+// Adds exactly one bot per call so the host can build a 1, 2 or 3 human table.
+app.post('/rooms/:roomId/add-bot', (req, res) => {
   const room = requireRoom(req.params.roomId);
-  addTestBots(room);
+  const body = actorSchema.parse(req.body);
+  requireHost(room, body.playerId, body.token);
+  requireLobby(room);
+
+  const seat = nextFreeSeat(room);
+  if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
+  room.players.push(createBot(room, seat as Seat));
+  touchRoom(room);
+  // Filling the last seat can be the event that completes readiness.
+  const started = maybeStartGame(room);
+  persistRoom(room);
+  void emitRoom(room);
+  return res.json({ ...sanitizeRoom(room), started });
+});
+
+app.post('/rooms/:roomId/remove-bot', (req, res) => {
+  const room = requireRoom(req.params.roomId);
+  const body = removeBotSchema.parse(req.body);
+  requireHost(room, body.playerId, body.token);
+  requireLobby(room);
+
+  const target = room.players.find((player) => player.id === body.botId);
+  if (!target) throw new HttpError(404, 'BOT_NOT_FOUND', localizeErrorCode('BOT_NOT_FOUND'));
+  if (!target.isBot) {
+    throw new HttpError(400, 'CANNOT_REMOVE_HUMAN', localizeErrorCode('CANNOT_REMOVE_HUMAN'));
+  }
+  room.players = room.players.filter((player) => player.id !== body.botId);
+  touchRoom(room);
   persistRoom(room);
   void emitRoom(room);
   return res.json(sanitizeRoom(room));
 });
 
-app.post('/rooms/:roomId/start', (req, res) => {
+// Any seated human can toggle their own readiness; the game auto-starts once
+// the table is full and every human is ready.
+app.post('/rooms/:roomId/ready', (req, res) => {
   const room = requireRoom(req.params.roomId);
-  if (room.players.length !== 4) {
-    return res.status(400).json(errorBody('ROOM_NOT_FULL'));
-  }
-  room.game = createGame(room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })), { id: room.id, targetScore: 7 });
-  room.status = 'playing';
-  autoAdvanceBots(room);
+  const body = readySchema.parse(req.body);
+  requireSession(room, body.playerId, body.token);
+  requireLobby(room);
+
+  const player = room.players.find((candidate) => candidate.id === body.playerId);
+  if (!player) throw new HttpError(404, 'PLAYER_NOT_FOUND', localizeErrorCode('PLAYER_NOT_FOUND'));
+  player.ready = body.ready;
+  touchRoom(room);
+
+  const started = maybeStartGame(room);
   persistRoom(room);
   void emitRoom(room);
-  return res.json(sanitizeRoom(room));
+  return res.json({ ...sanitizeRoom(room), started });
+});
+
+app.post('/rooms/:roomId/leave', (req, res) => {
+  const room = requireRoom(req.params.roomId);
+  const body = actorSchema.parse(req.body);
+  requireSession(room, body.playerId, body.token);
+  leaveRoom(room, body.playerId);
+  persistRoom(room);
+  void emitRoom(room);
+  return res.json({ ok: true, room: sanitizeRoom(room) });
 });
 
 if (shouldServeWebDist) {
@@ -184,9 +253,10 @@ io.on('connection', (socket) => {
       const { roomId, playerId, suit, token } = chooseTrumpSchema.parse(payload);
       const room = requireRoom(roomId);
       requireSession(room, playerId, token);
-      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
-      room.game = chooseTrump(room.game, playerId, suit);
+      requireActiveGame(room);
+      room.game = chooseTrump(room.game!, playerId, suit);
       autoAdvanceBots(room);
+      touchRoom(room);
       persistRoom(room);
       ack?.({ ok: true });
       void emitRoom(room);
@@ -200,10 +270,11 @@ io.on('connection', (socket) => {
       const { roomId, playerId, cardId, token } = playCardSchema.parse(payload);
       const room = requireRoom(roomId);
       requireSession(room, playerId, token);
-      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
-      room.game = playCard(room.game, playerId, cardId);
+      requireActiveGame(room);
+      room.game = playCard(room.game!, playerId, cardId);
       autoAdvanceBots(room);
       if (room.game.phase === 'game_complete') room.status = 'finished';
+      touchRoom(room);
       persistRoom(room);
       ack?.({ ok: true });
       void emitRoom(room);
@@ -221,9 +292,10 @@ io.on('connection', (socket) => {
       const { roomId, playerId, token } = nextHandSchema.parse(payload);
       const room = requireRoom(roomId);
       requireSession(room, playerId, token);
-      if (!room.game) throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
-      room.game = continueToNextHand(room.game);
+      requireActiveGame(room);
+      room.game = continueToNextHand(room.game!);
       autoAdvanceBots(room);
+      touchRoom(room);
       persistRoom(room);
       ack?.({ ok: true });
       void emitRoom(room);
@@ -236,6 +308,9 @@ io.on('connection', (socket) => {
 httpServer.listen(port, () => {
   console.log(`Hokm API listening on http://localhost:${port}`);
 });
+
+runRoomCleanup();
+setInterval(() => runRoomCleanup(), cleanupIntervalMs).unref();
 
 // The bot is optional infrastructure: if Telegram is unreachable the game API
 // must keep serving, so failures here are logged instead of crashing the process.
@@ -301,28 +376,83 @@ async function handleSocketDisconnect(socketId: string, roomId: unknown, playerI
   await emitRoom(room);
 }
 
+/**
+ * Deletes expired rooms and abandons stalled games.
+ * Runs once at boot (to clear anything accumulated while the server was down)
+ * and then on a timer.
+ */
+function runRoomCleanup(now = Date.now()): { deleted: number; abandoned: number } {
+  let deleted = 0;
+  let abandoned = 0;
+  for (const room of [...rooms.values()]) {
+    const action = cleanupAction(room, now, cleanupPolicy);
+    if (action === 'delete') {
+      rooms.delete(room.id);
+      roomStore.deleteRoom(room.id);
+      deleted += 1;
+    } else if (action === 'abandon' && room.status !== 'abandoned') {
+      room.status = 'abandoned';
+      touchRoom(room);
+      persistRoom(room);
+      abandoned += 1;
+    }
+  }
+  if (deleted > 0 || abandoned > 0) {
+    console.log(`Room cleanup: deleted=${deleted} abandoned=${abandoned} remaining=${rooms.size}`);
+  }
+  return { deleted, abandoned };
+}
+
+function hoursToMs(value: string | undefined, fallbackHours: number): number {
+  const hours = Number(value);
+  return (Number.isFinite(hours) && hours > 0 ? hours : fallbackHours) * 60 * 60 * 1000;
+}
+
 function persistRoom(room: Room): void {
   roomStore.saveRoom(room);
 }
 
+/** Backfills fields added after older snapshots were written. */
 function normalizeLoadedRoom(room: Room): Room {
+  const players = room.players.map((player) => ({
+    ...player,
+    connected: player.isBot ? true : false,
+    // Humans must press ready again after a restart; bots are always ready.
+    ready: player.isBot ? true : false,
+  }));
+  const firstHuman = players.find((player) => !player.isBot);
+  const hostPlayerId =
+    room.hostPlayerId && players.some((p) => p.id === room.hostPlayerId && !p.isBot)
+      ? room.hostPlayerId
+      : firstHuman?.id;
   return {
     ...room,
-    players: room.players.map((player) => ({
-      ...player,
-      connected: player.isBot ? true : false,
-    })),
+    players,
+    lastActivityAt: room.lastActivityAt ?? room.createdAt,
+    ...(hostPlayerId !== undefined ? { hostPlayerId } : {}),
   };
 }
 
 function createRoom(hostName: string, telegramId?: number): Room {
   const id = randomCode(10).toLowerCase();
+  const host: RoomPlayer = {
+    id: randomCode(12),
+    token: createPlayerToken(),
+    name: hostName,
+    seat: 0,
+    connected: false,
+    ready: false,
+    ...(telegramId !== undefined ? { telegramId } : {}),
+  };
+  const now = new Date().toISOString();
   const room: Room = {
     id,
     code: randomCode(5),
     status: 'lobby',
-    createdAt: new Date().toISOString(),
-    players: [{ id: randomCode(12), token: createPlayerToken(), name: hostName, seat: 0, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) }],
+    createdAt: now,
+    lastActivityAt: now,
+    hostPlayerId: host.id,
+    players: [host],
   };
   rooms.set(room.id, room);
   persistRoom(room);
@@ -330,6 +460,10 @@ function createRoom(hostName: string, telegramId?: number): Room {
 }
 
 function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
+  if (room.status === 'abandoned') {
+    throw new HttpError(400, 'ROOM_ABANDONED', localizeErrorCode('ROOM_ABANDONED'));
+  }
+  touchRoom(room);
   // A verified Telegram user always gets their previous seat back, even mid-game
   // and even from a new device, because their identity is now proven.
   const existing = telegramId !== undefined ? room.players.find((p) => p.telegramId === telegramId) : undefined;
@@ -337,6 +471,9 @@ function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
     existing.name = name;
     // Issue a fresh token so a reinstalled client can control the seat again.
     existing.token = createPlayerToken();
+    if (!room.players.some((p) => p.id === room.hostPlayerId && !p.isBot)) {
+      room.hostPlayerId = existing.id;
+    }
     return existing;
   }
   if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
@@ -344,28 +481,99 @@ function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
   const takenSeats = new Set(room.players.map((p) => p.seat));
   const seat = ([0, 1, 2, 3] as Seat[]).find((s) => !takenSeats.has(s));
   if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
-  const player: RoomPlayer = { id: randomCode(12), token: createPlayerToken(), name, seat, connected: false, ...(telegramId !== undefined ? { telegramId } : {}) };
+  const player: RoomPlayer = { id: randomCode(12), token: createPlayerToken(), name, seat, connected: false, ready: false, ...(telegramId !== undefined ? { telegramId } : {}) };
   room.players.push(player);
   return player;
 }
 
-function addTestBots(room: Room): void {
-  if (room.status !== 'lobby') throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
-  const botNames = ['ربات نیکا', 'ربات آرش', 'ربات سارا'];
-  let botIndex = room.players.filter((player) => player.isBot).length;
-  while (room.players.length < 4) {
-    const takenSeats = new Set(room.players.map((player) => player.seat));
-    const seat = ([0, 1, 2, 3] as Seat[]).find((candidate) => !takenSeats.has(candidate));
-    if (seat === undefined) return;
-    room.players.push({
-      id: `bot_${randomCode(10).toLowerCase()}`,
-      name: botNames[botIndex % botNames.length] ?? `ربات ${botIndex + 1}`,
-      seat,
-      connected: true,
-      isBot: true,
-    });
-    botIndex += 1;
+const BOT_NAMES = ['ربات نیکا', 'ربات آرش', 'ربات سارا'];
+
+function createBot(room: Room, seat: Seat): RoomPlayer {
+  const used = new Set(room.players.filter((p) => p.isBot).map((p) => p.name));
+  const name = BOT_NAMES.find((candidate) => !used.has(candidate)) ?? `ربات ${used.size + 1}`;
+  return {
+    id: `bot_${randomCode(10).toLowerCase()}`,
+    name,
+    seat,
+    connected: true,
+    ready: true,
+    isBot: true,
+  };
+}
+
+/** Gameplay is impossible once a table has been abandoned. */
+function requireActiveGame(room: Room): HokmGameState {
+  if (room.status === 'abandoned') {
+    throw new HttpError(400, 'ROOM_ABANDONED', localizeErrorCode('ROOM_ABANDONED'));
   }
+  if (!room.game) {
+    throw new HttpError(400, 'GAME_NOT_STARTED', localizeErrorCode('GAME_NOT_STARTED'));
+  }
+  return room.game;
+}
+
+function requireLobby(room: Room): void {
+  if (room.status === 'abandoned') {
+    throw new HttpError(400, 'ROOM_ABANDONED', localizeErrorCode('ROOM_ABANDONED'));
+  }
+  if (room.status !== 'lobby') {
+    throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
+  }
+}
+
+/** Verifies the caller is the host, on top of the normal session check. */
+function requireHost(room: Room, playerId: string, token: string | undefined): void {
+  requireSession(room, playerId, token);
+  if (room.hostPlayerId !== playerId) {
+    throw new HttpError(403, 'NOT_HOST', localizeErrorCode('NOT_HOST'));
+  }
+}
+
+function touchRoom(room: Room): void {
+  room.lastActivityAt = new Date().toISOString();
+}
+
+/** Starts the game when the table is full and every human pressed ready. */
+function maybeStartGame(room: Room): boolean {
+  if (!evaluateReadiness(room).canStart) return false;
+  room.game = createGame(
+    room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })),
+    { id: room.id, targetScore: 7 },
+  );
+  room.status = 'playing';
+  autoAdvanceBots(room);
+  touchRoom(room);
+  return true;
+}
+
+/**
+ * Removes a player from a lobby, or marks them gone mid-game.
+ *
+ * Mid-game the seat is kept on purpose: the engine state is indexed by seat, so
+ * deleting a player would corrupt hands and scores. The player can come back.
+ */
+function leaveRoom(room: Room, playerId: string): void {
+  const player = room.players.find((candidate) => candidate.id === playerId);
+  if (!player) throw new HttpError(404, 'PLAYER_NOT_FOUND', localizeErrorCode('PLAYER_NOT_FOUND'));
+
+  if (room.status === 'lobby') {
+    room.players = room.players.filter((candidate) => candidate.id !== playerId);
+  } else {
+    player.connected = false;
+    player.ready = false;
+  }
+
+  if (room.hostPlayerId === playerId) {
+    const nextHost = pickNextHost(room, playerId);
+    if (nextHost) room.hostPlayerId = nextHost;
+  }
+
+  if (hasNoHumans(room)) {
+    room.status = room.status === 'playing' ? 'abandoned' : room.status;
+    if (room.status === 'lobby') room.status = 'abandoned';
+  }
+
+  touchRoom(room);
 }
 
 function autoAdvanceBots(room: Room): void {
@@ -419,8 +627,15 @@ async function emitRoom(room: Room) {
 }
 
 function sanitizeRoom(room: Room) {
+  const readiness = evaluateReadiness(room);
   return {
     ...room,
+    readiness: {
+      waitingOn: readiness.waitingOn,
+      humanCount: readiness.humanCount,
+      botCount: readiness.botCount,
+      canStart: readiness.canStart,
+    },
     players: room.players.map(withoutToken),
     game: room.game
       ? {
@@ -559,4 +774,7 @@ const socketJoinSchema = z.object({ roomId: z.string().min(1), playerId: z.strin
 const suitSchema: z.ZodType<Suit> = z.enum(['spades', 'hearts', 'diamonds', 'clubs']);
 const chooseTrumpSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional(), suit: suitSchema });
 const playCardSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional(), cardId: z.string().min(1) });
+const actorSchema = z.object({ playerId: z.string().min(1), token: z.string().min(1).optional() });
+const removeBotSchema = actorSchema.extend({ botId: z.string().min(1) });
+const readySchema = actorSchema.extend({ ready: z.boolean().default(true) });
 const nextHandSchema = z.object({ roomId: z.string().min(1), playerId: z.string().min(1), token: z.string().min(1).optional() });

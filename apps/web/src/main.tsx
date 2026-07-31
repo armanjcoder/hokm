@@ -26,12 +26,15 @@ declare global {
   }
 }
 
-type RoomStatus = 'lobby' | 'playing' | 'finished';
-interface RoomPlayer { id: string; name: string; telegramId?: number; seat: number; connected: boolean; isBot?: boolean }
+type RoomStatus = 'lobby' | 'playing' | 'finished' | 'abandoned';
+interface RoomPlayer { id: string; name: string; telegramId?: number; seat: number; connected: boolean; ready?: boolean; isBot?: boolean }
+interface Readiness { waitingOn: string[]; humanCount: number; botCount: number; canStart: boolean }
 interface RoomView {
   id: string;
   code: string;
   status: RoomStatus;
+  hostPlayerId?: string;
+  readiness?: Readiness;
   players: RoomPlayer[];
   game?: PublicGameView;
 }
@@ -61,6 +64,8 @@ function App() {
   const [connection, setConnection] = useState<ConnectionStatus>('connecting');
   const [savedSession, setSavedSession] = useState<StoredSession | null>(() => readSession(initialApiUrl));
   const [sessionPhase, setSessionPhase] = useState<SessionPhase>('idle');
+  const [starting, setStarting] = useState(false);
+  const [lobbyBusy, setLobbyBusy] = useState(false);
   const autoJoinAttempted = useRef(false);
 
   const socket = useMemo<Socket>(
@@ -84,6 +89,12 @@ function App() {
     window.Telegram?.WebApp?.ready();
     window.Telegram?.WebApp?.expand();
   }, []);
+
+  useEffect(() => {
+    if (!starting) return;
+    const timer = setTimeout(() => setStarting(false), 2200);
+    return () => clearTimeout(timer);
+  }, [starting]);
 
   useEffect(() => {
     if (!session) return;
@@ -125,7 +136,14 @@ function App() {
 
     const handleDisconnect = () => setConnection('offline');
     const handleReconnectAttempt = () => setConnection('connecting');
-    const handleRoomUpdate = (nextRoom: RoomView) => setRoom(nextRoom);
+    const handleRoomUpdate = (nextRoom: RoomView) => {
+      setRoom((previous) => {
+        // Everyone at the table sees the start animation, not just the last
+        // player who pressed ready.
+        if (previous?.status === 'lobby' && nextRoom.status === 'playing') setStarting(true);
+        return nextRoom;
+      });
+    };
 
     socket.on('connect', joinRoomOverSocket);
     socket.on('disconnect', handleDisconnect);
@@ -248,26 +266,49 @@ function App() {
     }
   }
 
-  async function startGame() {
-    if (!room) return;
+  /** Shared POST helper for the lobby actions, all of which are session-authed. */
+  async function lobbyAction(path: string, extra: Record<string, unknown> = {}, fallback = 'این کار انجام نشد.') {
+    if (!room || !session) return undefined;
+    if (!requireConnection()) return undefined;
+    setLobbyBusy(true);
     try {
-      const response = await fetch(`${apiUrl}/rooms/${room.id}/start`, { method: 'POST' });
+      const response = await fetch(`${apiUrl}/rooms/${room.id}/${path}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...socketPayload(session), ...extra }),
+      });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) setToast(userMessage(data, 'برای شروع باید هر ۴ بازیکن داخل میز باشند.'));
+      if (!response.ok) {
+        setToast(userMessage(data, fallback));
+        return undefined;
+      }
+      return data;
     } catch {
       setToast('ارتباط با سرور برقرار نشد. بک‌اند و آدرس API را چک کن.');
+      return undefined;
+    } finally {
+      setLobbyBusy(false);
     }
   }
 
-  async function addTestBots() {
-    if (!room) return;
-    try {
-      const response = await fetch(`${apiUrl}/rooms/${room.id}/add-bots`, { method: 'POST' });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) setToast(userMessage(data, 'اضافه کردن ربات‌های تست انجام نشد.'));
-    } catch {
-      setToast('ارتباط با سرور برقرار نشد. بک‌اند و آدرس API را چک کن.');
-    }
+  async function toggleReady() {
+    const next = !me?.ready;
+    const data = await lobbyAction('ready', { ready: next }, 'ثبت آمادگی انجام نشد.');
+    if (data?.started) setStarting(true);
+  }
+
+  async function addBot() {
+    const data = await lobbyAction('add-bot', {}, 'اضافه کردن ربات انجام نشد.');
+    if (data?.started) setStarting(true);
+  }
+
+  function removeBot(botId: string) {
+    void lobbyAction('remove-bot', { botId }, 'حذف ربات انجام نشد.');
+  }
+
+  async function leaveRoom() {
+    const data = await lobbyAction('leave', {}, 'خروج از میز انجام نشد.');
+    if (data) forgetSession('از میز خارج شدی.');
   }
 
   function chooseSuit(suit: Suit) {
@@ -335,7 +376,26 @@ function App() {
   return (
     <main className="app-shell">
       <TopBar room={room} me={me} apiUrl={apiUrl} connection={connection} />
-      {room.status === 'lobby' && <Lobby room={room} startGame={startGame} addTestBots={addTestBots} invite={() => shareRoom(room.id, apiUrl)} />}
+      {room.status === 'lobby' && (
+        <Lobby
+          room={room}
+          me={me}
+          isHost={room.hostPlayerId === session.playerId}
+          toggleReady={toggleReady}
+          addBot={addBot}
+          removeBot={removeBot}
+          leaveRoom={leaveRoom}
+          busy={lobbyBusy}
+          invite={() => shareRoom(room.id, apiUrl)}
+        />
+      )}
+      {room.status === 'abandoned' && (
+        <section className="panel">
+          <h2>این میز رها شده است</h2>
+          <p>همه بازیکنان میز را ترک کرده‌اند. یک میز جدید بساز.</p>
+          <button className="primary" onClick={leaveRoom}>برگشت به صفحه اول</button>
+        </section>
+      )}
       {room.status !== 'lobby' && game && (
         <GameTable
           room={room}
@@ -347,6 +407,7 @@ function App() {
         />
       )}
       {toast && <button className="toast" onClick={() => setToast('')}>{toast}</button>}
+      {starting && <StartOverlay />}
     </main>
   );
 }
@@ -448,30 +509,107 @@ function TopBar({ room, me, apiUrl, connection }: { room: RoomView; me: RoomPlay
   );
 }
 
-function Lobby({ room, startGame, addTestBots, invite }: { room: RoomView; startGame: () => void; addTestBots: () => void; invite: () => void }) {
+function StartOverlay() {
+  return (
+    <div className="start-overlay" role="status" aria-live="polite">
+      <div className="start-overlay__card">
+        <div className="start-overlay__suits">
+          {suits.map((suit, index) => (
+            <span key={suit.id} className={`start-suit ${suit.color}`} style={{ animationDelay: `${index * 0.12}s` }}>
+              {suit.symbol}
+            </span>
+          ))}
+        </div>
+        <h2>بازی شروع شد</h2>
+        <p>در حال پخش کارت‌ها…</p>
+        <div className="start-overlay__bar"><span /></div>
+      </div>
+    </div>
+  );
+}
+
+function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy }: {
+  room: RoomView;
+  me: RoomPlayer | undefined;
+  isHost: boolean;
+  toggleReady: () => void;
+  addBot: () => void;
+  removeBot: (botId: string) => void;
+  leaveRoom: () => void;
+  invite: () => void;
+  busy: boolean;
+}) {
+  const readiness = room.readiness;
+  const seatsFull = room.players.length === 4;
+  const waiting = readiness?.waitingOn.length ?? 0;
+
   return (
     <section className="panel lobby-panel">
       <h2>لابی میز</h2>
       <p>یارها روبه‌روی هم هستند: صندلی‌های ۱ و ۳ در برابر ۲ و ۴.</p>
+
       <div className="seat-grid">
         {[0, 1, 2, 3].map((seat) => {
           const player = room.players.find((p) => p.seat === seat);
-          const offline = Boolean(player) && !player?.connected;
+          const offline = Boolean(player) && !player?.isBot && !player?.connected;
+          const isMe = player?.id === me?.id;
+          const host = Boolean(player) && player?.id === room.hostPlayerId;
           return (
-            <div className={`seat-card ${offline ? 'offline' : ''}`} key={seat}>
-              <span>صندلی {seat + 1}</span>
-              <strong>{player ? `${player.name}${player.isBot ? ' 🤖' : ''}` : 'در انتظار بازیکن...'}</strong>
-              {offline && <em className="seat-status">قطع شده</em>}
+            <div className={`seat-card ${offline ? 'offline' : ''} ${player?.ready ? 'ready' : ''}`} key={seat}>
+              <span>
+                صندلی {seat + 1}
+                {host && <b className="host-tag">سازنده</b>}
+              </span>
+              <strong>
+                {player ? `${player.name}${player.isBot ? ' 🤖' : ''}${isMe ? ' (تو)' : ''}` : 'در انتظار بازیکن...'}
+              </strong>
+              <div className="seat-footer">
+                {player && !player.isBot && (
+                  <em className={`seat-status ${player.ready ? 'is-ready' : ''}`}>
+                    {player.ready ? 'آماده ✓' : offline ? 'قطع شده' : 'در انتظار آمادگی'}
+                  </em>
+                )}
+                {player?.isBot && isHost && (
+                  <button className="seat-remove" type="button" disabled={busy} onClick={() => removeBot(player.id)}>
+                    حذف ربات
+                  </button>
+                )}
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="row-actions">
-        <button className="primary" onClick={startGame}>شروع بازی</button>
-        <button className="ghost" onClick={invite}>دعوت دوستان</button>
+
+      <div className="ready-status">
+        {!seatsFull
+          ? `برای شروع به ۴ بازیکن نیاز داریم. الان ${room.players.length} نفر سر میز هستند.`
+          : waiting > 0
+            ? `منتظر آمادگی ${waiting} بازیکن هستیم.`
+            : 'همه آماده‌اند! بازی در حال شروع است…'}
       </div>
-      {room.players.length < 4 && (
-        <button className="test-bots-button" onClick={addTestBots}>تست تک‌نفره: اضافه کردن ربات‌ها 🤖</button>
+
+      <button
+        className={`ready-button ${me?.ready ? 'is-ready' : ''}`}
+        type="button"
+        disabled={busy}
+        aria-pressed={Boolean(me?.ready)}
+        onClick={toggleReady}
+      >
+        {me?.ready ? 'آماده‌ام ✓ (لغو)' : 'آماده بازی'}
+      </button>
+
+      <div className="row-actions">
+        <button className="ghost" onClick={invite}>دعوت دوستان</button>
+        <button className="ghost danger" type="button" disabled={busy} onClick={leaveRoom}>خروج از میز</button>
+      </div>
+
+      {isHost && !seatsFull && (
+        <button className="test-bots-button" type="button" disabled={busy} onClick={addBot}>
+          افزودن یک ربات 🤖
+        </button>
+      )}
+      {!isHost && !seatsFull && (
+        <p className="hint">فقط سازنده میز می‌تواند ربات اضافه یا حذف کند.</p>
       )}
     </section>
   );
