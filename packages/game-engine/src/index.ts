@@ -275,11 +275,14 @@ export function continueToNextHand(state: HokmGameState, rng: () => number = Mat
 
 export function toPublicView(state: HokmGameState, playerId: string): PublicGameView {
   const player = getPlayer(state, playerId);
-  const myHand = state.hands[player.seat];
+  // `hands` must never be spread into the view: it holds every player's cards,
+  // and this payload is sent straight to a client. Build the view explicitly so
+  // adding a field to the state can never leak it by accident.
+  const { hands, players, ...rest } = state;
   return {
-    ...state,
-    players: state.players.map((p) => ({ ...p, cardCount: state.hands[p.seat].length })),
-    myHand,
+    ...rest,
+    players: players.map((p) => ({ ...p, cardCount: hands[p.seat].length })),
+    myHand: hands[player.seat],
     validCardIds: getValidCards(state, playerId).map((card) => card.id),
   };
 }

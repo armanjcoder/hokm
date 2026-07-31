@@ -660,16 +660,23 @@ function autoAdvanceBots(room: Room): void {
     const bot = room.players.find((player) => player.isBot && player.seat === room.game?.currentTurnSeat);
     if (!bot) return;
 
-    if (room.game.phase === 'waiting_for_trump') {
-      room.game = chooseTrump(room.game, bot.id, chooseBotTrump(room.game, bot.seat));
-      continue;
-    }
+    // A bot must never be able to crash a request handler and leave the table
+    // in a half-updated state; stop advancing and let humans continue instead.
+    try {
+      if (room.game.phase === 'waiting_for_trump') {
+        room.game = chooseTrump(room.game, bot.id, chooseBotTrump(room.game, bot.seat));
+        continue;
+      }
 
-    if (room.game.phase !== 'playing') return;
-    const validCards = getValidCards(room.game, bot.id);
-    const card = chooseBotCard(validCards);
-    if (!card) return;
-    room.game = playCard(room.game, bot.id, card.id);
+      if (room.game.phase !== 'playing') return;
+      const validCards = getValidCards(room.game, bot.id);
+      const card = chooseBotCard(validCards);
+      if (!card) return;
+      room.game = playCard(room.game, bot.id, card.id);
+    } catch (error) {
+      console.error(`Bot ${bot.id} could not move in room ${room.id}.`, error);
+      return;
+    }
   }
 }
 

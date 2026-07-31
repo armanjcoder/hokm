@@ -235,3 +235,79 @@ describe('concurrent joins cannot oversubscribe a table', () => {
     expect(new Set(seats).size).toBe(seats.length);
   }, 60000);
 });
+
+describe('no player can see another player\'s cards', () => {
+  let table: ServerHarness;
+
+  beforeAll(async () => {
+    table = await ServerHarness.create({
+      RATE_LIMIT_CREATE_PER_MIN: '200',
+      RATE_LIMIT_ACTIONS_PER_MIN: '500',
+    });
+    await table.start();
+  }, 60000);
+
+  afterAll(async () => {
+    await table?.dispose();
+  });
+
+  it('never sends the full hands map to a client', async () => {
+    const created = await (
+      await fetch(`${table.url}/rooms`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ hostName: 'آرمان' }),
+      })
+    ).json();
+
+    const host = {
+      roomId: created.id as string,
+      playerId: created.players[0].id as string,
+      token: created.token as string,
+    };
+    const guestRes = await (
+      await fetch(`${table.url}/rooms/${host.roomId}/join`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ name: 'نیکا' }),
+      })
+    ).json();
+    const guest = {
+      roomId: host.roomId,
+      playerId: guestRes.player.id as string,
+      token: guestRes.token as string,
+    };
+
+    const call = (session: object, path: string, extra: object = {}) =>
+      fetch(`${table.url}/rooms/${host.roomId}/${path}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...session, ...extra }),
+      });
+
+    await call(host, 'add-bot');
+    await call(host, 'add-bot');
+    await call(host, 'ready', { ready: true });
+    await call(guest, 'ready', { ready: true });
+
+    const socket = io(table.url, { transports: ['websocket'] });
+    openSockets.push(socket);
+    await new Promise<void>((resolve) => socket.on('connect', () => resolve()));
+    const ack = await new Promise<any>((resolve) =>
+      socket.emit('room:join', guest, (response: any) => resolve(response)),
+    );
+
+    expect(ack.ok).toBe(true);
+    const game = ack.room.game;
+    expect(game).toBeTruthy();
+    // The private state must not travel to the client under any key.
+    expect(game.hands).toBeUndefined();
+    expect(JSON.stringify(ack.room)).not.toContain('"hands"');
+
+    // The player still receives their own cards (5 before trump is chosen).
+    expect(game.myHand.length).toBeGreaterThan(0);
+    const myIds = new Set(game.myHand.map((card: any) => card.id));
+    expect(myIds.size).toBe(game.myHand.length);
+    socket.close();
+  }, 60000);
+});

@@ -85,7 +85,8 @@ label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
 .trump-picker button { min-height: 76px; border-radius: 22px; background: rgba(255,255,255,.92); display: grid; place-items: center; gap: 2px; font-weight: 800; }
 .trump-picker button { color: #111827; }
 .trump-picker button.red { color: #e11d48; }
-.trump-picker button:first-letter { font-size: 30px; }
+.trump-picker button span:first-child { font-size: 30px; line-height: 1; }
+.trump-picker button span:last-child { font-size: 13px; font-weight: 700; }
 .wait-card, .result-card { padding: 18px; text-align: center; }
 .result-card { position: absolute; z-index: 6; inset: 26% 14px auto; }
 .toast { position: fixed; z-index: 10; left: 14px; right: 14px; bottom: 18px; padding: 14px 16px; border-radius: 18px; color: #fff; background: rgba(18,18,28,.94); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 14px 38px rgba(0,0,0,.4); }

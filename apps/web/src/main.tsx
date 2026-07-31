@@ -393,10 +393,17 @@ function App() {
         <section className="panel">
           <h2>این میز رها شده است</h2>
           <p>همه بازیکنان میز را ترک کرده‌اند. یک میز جدید بساز.</p>
-          <button className="primary" onClick={leaveRoom}>برگشت به صفحه اول</button>
+          {/* Purely local: the server rejects actions on an abandoned table. */}
+          <button
+            className="primary"
+            type="button"
+            onClick={() => forgetSession('میز قبلی رها شده بود. حالا می‌تونی میز جدید بسازی.')}
+          >
+            ساخت میز جدید
+          </button>
         </section>
       )}
-      {room.status !== 'lobby' && game && (
+      {room.status !== 'lobby' && room.status !== 'abandoned' && game && (
         <GameTable
           room={room}
           game={game}
@@ -406,7 +413,11 @@ function App() {
           nextHand={nextHand}
         />
       )}
-      {toast && <button className="toast" onClick={() => setToast('')}>{toast}</button>}
+      {toast && (
+        <button className="toast" type="button" role="alert" onClick={() => setToast('')}>
+          {toast}
+        </button>
+      )}
       {starting && <StartOverlay />}
     </main>
   );
@@ -632,12 +643,24 @@ function GameTable({ room, game, meId, chooseSuit, play, nextHand }: {
       </div>
 
       {game.phase === 'waiting_for_trump' && isHakem && (
-        <div className="trump-picker glass"><h3>حکم رو انتخاب کن</h3><div>{suits.map((s) => <button key={s.id} className={s.color} onClick={() => chooseSuit(s.id)}>{s.symbol}<span>{s.label}</span></button>)}</div></div>
+        <div className="trump-picker glass">
+          <h3 id="trump-title">حکم رو انتخاب کن</h3>
+          <div role="group" aria-labelledby="trump-title">
+            {suits.map((s) => (
+              <button key={s.id} type="button" className={s.color} aria-label={`انتخاب حکم ${s.label}`} onClick={() => chooseSuit(s.id)}>
+                <span aria-hidden="true">{s.symbol}</span>
+                <span>{s.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       {game.phase === 'waiting_for_trump' && !isHakem && <div className="glass wait-card">منتظر انتخاب حکم توسط حاکم...</div>}
 
       <div className="table-center">
-        <div className="turn-badge">{isMyTurn ? 'نوبت توئه' : `نوبت صندلی ${game.currentTurnSeat + 1}`}</div>
+        <div className="turn-badge" role="status" aria-live="polite">
+          {isMyTurn ? 'نوبت توئه' : `نوبت صندلی ${game.currentTurnSeat + 1}`}
+        </div>
         <div className="played-cards">
           {game.currentTrick.plays.map((play) => <PlayingCard key={`${play.seat}-${play.card.id}`} card={play.card} compact />)}
         </div>
@@ -665,7 +688,20 @@ function Score({ title, match, tricks }: { title: string; match: number; tricks:
 
 function PlayingCard({ card, disabled, compact, onClick }: { card: Card; disabled?: boolean; compact?: boolean; onClick?: () => void }) {
   const suit = suits.find((s) => s.id === card.suit)!;
-  return <button className={`card ${suit.color} ${compact ? 'compact' : ''}`} disabled={disabled} onClick={onClick}><span>{card.rank}</span><b>{suit.symbol}</b></button>;
+  const label = `${card.rank} ${suit.label}`;
+  return (
+    <button
+      type="button"
+      className={`card ${suit.color} ${compact ? 'compact' : ''}`}
+      disabled={disabled}
+      aria-label={compact ? label : `بازی کردن ${label}`}
+      title={label}
+      onClick={onClick}
+    >
+      <span aria-hidden="true">{card.rank}</span>
+      <b aria-hidden="true">{suit.symbol}</b>
+    </button>
+  );
 }
 
 function suitSymbol(suit: Suit) {
