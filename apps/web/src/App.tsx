@@ -22,6 +22,7 @@ import { RulesGuide } from './components/RulesGuide.js';
 import { TableScreen } from './components/TableScreen.js';
 import { renderEntryScreen } from './components/EntryScreen.js';
 import { shareRoom } from './api/share.js';
+import { announceReady } from './api/telegram-sdk.js';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL || defaultApiUrl();
 
@@ -50,8 +51,7 @@ export function App() {
   const game = room?.game;
 
   useEffect(() => {
-    window.Telegram?.WebApp?.ready();
-    window.Telegram?.WebApp?.expand();
+    announceReady();
   }, []);
 
   useEffect(() => {

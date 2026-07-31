@@ -19,3 +19,42 @@ button { border: 0; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .42; }
 input { width: 100%; border: 1px solid rgba(255,255,255,.12); color: #fff; background: rgba(255,255,255,.07); border-radius: 18px; padding: 14px 16px; outline: none; transition: .2s; }
 input:focus { border-color: rgba(131, 113, 255, .8); box-shadow: 0 0 0 4px rgba(131, 113, 255, .14); }
+
+/* Boot splash: lives in index.html and is replaced the moment React mounts.
+   Keeps the screen alive while the Telegram SDK is being fetched. */
+.boot-splash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 14px;
+}
+
+.boot-splash__mark {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-content: center;
+  font-size: 30px;
+  border-radius: 20px;
+  color: #f4f4ff;
+  background: linear-gradient(140deg, rgba(126, 87, 255, 0.55), rgba(0, 190, 160, 0.35));
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  animation: boot-splash-pulse 1.4s ease-in-out infinite;
+}
+
+.boot-splash__text {
+  margin: 0;
+  font-size: 14px;
+  color: rgba(233, 233, 255, 0.66);
+}
+
+@keyframes boot-splash-pulse {
+  0%, 100% { transform: scale(1); opacity: 0.85; }
+  50% { transform: scale(1.07); opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash__mark { animation: none; }
+}
