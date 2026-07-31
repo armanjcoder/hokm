@@ -66,3 +66,22 @@ describe('RulesGuide', () => {
     expect(dialog.getAttribute('aria-labelledby')).toBe('rules-title');
   });
 });
+
+describe('TopBar help button', () => {
+  it('exposes an accessible always-available help control', async () => {
+    const { TopBar } = await import('../src/components/TopBar.js');
+    const showRules = vi.fn();
+    render(
+      <TopBar
+        room={{ id: 'r', code: 'ABCDE', status: 'playing', players: [] }}
+        me={undefined}
+        apiUrl="https://x"
+        connection="connected"
+        showRules={showRules}
+      />,
+    );
+    const help = screen.getByLabelText('راهنمای قوانین');
+    fireEvent.click(help);
+    expect(showRules).toHaveBeenCalledTimes(1);
+  });
+});

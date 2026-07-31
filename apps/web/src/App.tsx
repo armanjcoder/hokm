@@ -229,7 +229,13 @@ export function App() {
 
   return (
     <main className="app-shell">
-      <TopBar room={room} me={me} apiUrl={apiUrl} connection={connection} />
+      <TopBar
+        room={room}
+        me={me}
+        apiUrl={apiUrl}
+        connection={connection}
+        showRules={() => setRulesFor(room.mode ?? 'classic4')}
+      />
       {room.status === 'lobby' && (
         <Lobby
           room={room}

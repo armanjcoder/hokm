@@ -25,3 +25,5 @@
 .seat-status { display: block; margin-top: 6px; font-size: 12px; font-style: normal; color: #ff9db0; }
 .row-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .test-bots-button { width: 100%; margin-top: 10px; color: #111827; background: linear-gradient(135deg, #fff3b0, #ffc857); border-radius: 18px; padding: 14px 18px; font-weight: 900; box-shadow: 0 12px 28px rgba(255, 200, 87, .18); }
+.help-button { display: grid; place-items: center; width: 28px; height: 28px; border-radius: 50%; border: 1px solid rgba(255,255,255,.18); background: rgba(255,255,255,.08); color: #d9d5ff; font-family: inherit; font-size: 15px; font-weight: 800; cursor: pointer; }
+.help-button:hover { background: rgba(255,255,255,.16); }
