@@ -67,9 +67,9 @@ export function normalizeLoadedRoom(room: Room): Room {
     targetScore: room.targetScore ?? 7,
     // Older snapshots predate some rule flags, so fill in any that are missing.
     rules: {
-      lowHandRedeal: room.rules?.lowHandRedeal ?? false,
+      lowHandRedeal: room.rules?.lowHandRedeal ?? true,
       maxRedeals: room.rules?.maxRedeals ?? 2,
-      bam: room.rules?.bam ?? false,
+      bam: room.rules?.bam ?? true,
     },
     players,
     lastActivityAt: room.lastActivityAt ?? room.createdAt,

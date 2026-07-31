@@ -17,7 +17,8 @@ import { autoAdvanceBots } from './bots.js';
 /** Table lifecycle: creating, joining, readiness, leaving and authorisation. */
 
 /** Optional rules stay off unless the host turns them on. */
-export const DEFAULT_ROOM_RULES: OptionalRules = { lowHandRedeal: false, maxRedeals: 2, bam: false };
+/** Matches how Hokm is normally played: both house rules on by default. */
+export const DEFAULT_ROOM_RULES: OptionalRules = { lowHandRedeal: true, maxRedeals: 2, bam: true };
 
 export function createRoom(
   hostName: string,

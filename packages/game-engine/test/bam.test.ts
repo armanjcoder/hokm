@@ -63,14 +63,14 @@ function stateWith(
   };
 }
 
-describe('bam is opt-in', () => {
-  it('is off by default', () => {
+describe('bam can be switched off', () => {
+  it('is on by default, matching how Hokm is normally played', () => {
     const game = createGame(players, { rng: seededRng() });
-    expect(game.rules.bam).toBe(false);
+    expect(game.rules.bam).toBe(true);
   });
 
-  it('a hand still stops at seven tricks when the rule is off', () => {
-    let game = createGame(players, { hakemSeat: 0, rng: seededRng(5) });
+  it('a hand stops at seven tricks once a host turns the rule off', () => {
+    let game = createGame(players, { hakemSeat: 0, rng: seededRng(5), rules: { bam: false } });
     game = chooseTrump(game, 'p0', 'hearts', seededRng(6));
 
     let guard = 0;

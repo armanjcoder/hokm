@@ -66,15 +66,20 @@ describe('low hand detection', () => {
   });
 });
 
-describe('rule is opt-in', () => {
-  it('is disabled by default so existing behaviour is unchanged', () => {
+describe('rule can be switched off', () => {
+  it('is enabled by default, matching how Hokm is normally played', () => {
     const game = newGame();
-    expect(game.rules.lowHandRedeal).toBe(false);
-    expect(game.canRequestRedeal).toBe(false);
+    expect(game.rules.lowHandRedeal).toBe(true);
   });
 
-  it('refuses a redeal while the rule is off, even with a weak hand', () => {
-    const weak = withHakemHand(newGame(), [card('10'), card('9'), card('5'), card('3'), card('2')]);
+  it('refuses a redeal once a host turns the rule off', () => {
+    const weak = withHakemHand(newGame({ lowHandRedeal: false }), [
+      card('10'),
+      card('9'),
+      card('5'),
+      card('3'),
+      card('2'),
+    ]);
     expect(() => requestRedeal(weak, 'p0')).toThrow(/disabled/i);
   });
 

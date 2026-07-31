@@ -9,10 +9,14 @@ export function emptyTrickScore(config: ModeConfig): Record<TeamId, number> {
   return Object.fromEntries(teamsOf(config).map((team) => [team, 0])) as Record<TeamId, number>;
 }
 
+/**
+ * Defaults mirror how Hokm is normally played at a real table: both house
+ * rules are on unless a host deliberately turns them off.
+ */
 export const DEFAULT_RULES: OptionalRules = {
-  lowHandRedeal: false,
+  lowHandRedeal: true,
   maxRedeals: 2,
-  bam: false,
+  bam: true,
 };
 
 export function startNewHand(input: {

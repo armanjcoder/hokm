@@ -241,17 +241,17 @@ describe('target score and host settings', () => {
 });
 
 describe('optional rule: low hand redeal', () => {
-  it('is off by default', async () => {
+  it('is on by default, as at a real table', async () => {
     const host = await newTable('classic4');
-    expect(host.body.rules.lowHandRedeal).toBe(false);
+    expect(host.body.rules.lowHandRedeal).toBe(true);
   });
 
-  it('can be enabled at creation time', async () => {
+  it('can be disabled at creation time', async () => {
     const created = await post('/rooms', {
       hostName: 'آرمان',
-      rules: { lowHandRedeal: true },
+      rules: { lowHandRedeal: false },
     });
-    expect(created.body.rules.lowHandRedeal).toBe(true);
+    expect(created.body.rules.lowHandRedeal).toBe(false);
   });
 
   it('can be toggled by the host from the lobby', async () => {
@@ -318,19 +318,19 @@ describe('optional rule: low hand redeal', () => {
 });
 
 describe('optional rule: bam', () => {
-  it('is off by default', async () => {
+  it('is on by default, as at a real table', async () => {
     const host = await newTable('classic4');
-    expect(host.body.rules.bam).toBe(false);
+    expect(host.body.rules.bam).toBe(true);
   });
 
   it('can be toggled independently of the redeal rule', async () => {
     const host = await newTable('classic4');
-    await post(`/rooms/${host.roomId}/settings`, { ...host, rules: { lowHandRedeal: true } });
-    const withBam = await post(`/rooms/${host.roomId}/settings`, { ...host, rules: { bam: true } });
+    await post(`/rooms/${host.roomId}/settings`, { ...host, rules: { lowHandRedeal: false } });
+    const withBam = await post(`/rooms/${host.roomId}/settings`, { ...host, rules: { bam: false } });
 
-    // Turning one on must not turn the other off.
-    expect(withBam.body.rules.lowHandRedeal).toBe(true);
-    expect(withBam.body.rules.bam).toBe(true);
+    // Turning one off must not disturb the other.
+    expect(withBam.body.rules.lowHandRedeal).toBe(false);
+    expect(withBam.body.rules.bam).toBe(false);
   });
 
   it('carries into the started game', async () => {
