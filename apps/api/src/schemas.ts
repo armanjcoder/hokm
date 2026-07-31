@@ -44,6 +44,19 @@ export const actorSchema = z.object({
 
 export const removeBotSchema = actorSchema.extend({ botId: z.string().min(1) });
 
+export const difficultySchema = z.enum(['easy', 'medium', 'hard']);
+
+/** Adding a bot may specify how strong it plays. */
+export const addBotSchema = actorSchema.extend({
+  difficulty: difficultySchema.optional(),
+});
+
+/** Changing an existing bot's difficulty. */
+export const botDifficultySchema = actorSchema.extend({
+  botId: z.string().min(1),
+  difficulty: difficultySchema,
+});
+
 /** Host-only lobby settings; each field is optional so one can change alone. */
 export const settingsSchema = actorSchema.extend({
   mode: modeSchema.optional(),

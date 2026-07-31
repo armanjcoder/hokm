@@ -4,6 +4,7 @@ import { authenticate } from '../auth.js';
 import { config } from '../config.js';
 import { HttpError } from '../errors.js';
 import { createBot } from '../game/bots.js';
+import { DEFAULT_BOT_DIFFICULTY } from '../game/bot-ai.js';
 import {
   createRoom,
   DEFAULT_ROOM_RULES,
@@ -22,6 +23,8 @@ import { nextFreeSeat } from '../room-lifecycle.js';
 import { sanitizeDisplayName } from '../sanitize.js';
 import {
   actorSchema,
+  addBotSchema,
+  botDifficultySchema,
   createRoomSchema,
   joinRoomSchema,
   readySchema,
@@ -129,14 +132,14 @@ roomsRouter.post('/rooms/:roomId/settings', (req, res) => {
 roomsRouter.post('/rooms/:roomId/add-bot', (req, res) => {
   if (!enforceLimit(lobbyLimiter, req, res)) return;
   const room = requireRoom(req.params.roomId);
-  const body = actorSchema.parse(req.body);
+  const body = addBotSchema.parse(req.body);
   requireHost(room, body.playerId, body.token);
   requireLobby(room);
 
   const seat = nextFreeSeat(room);
   if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
 
-  room.players.push(createBot(room, seat as Seat));
+  room.players.push(createBot(room, seat as Seat, body.difficulty ?? DEFAULT_BOT_DIFFICULTY));
   touchRoom(room);
   // Filling the last seat can be the event that completes readiness.
   const started = maybeStartGame(room);
@@ -144,6 +147,27 @@ roomsRouter.post('/rooms/:roomId/add-bot', (req, res) => {
   void emitRoom(room);
 
   return res.json({ ...sanitizeRoom(room), started });
+});
+
+// Each bot can play at its own level, so a table can mix easy and hard.
+roomsRouter.post('/rooms/:roomId/bot-difficulty', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
+  const room = requireRoom(req.params.roomId);
+  const body = botDifficultySchema.parse(req.body);
+  requireHost(room, body.playerId, body.token);
+  requireLobby(room);
+
+  const target = room.players.find((player) => player.id === body.botId);
+  if (!target) throw new HttpError(404, 'BOT_NOT_FOUND', localizeErrorCode('BOT_NOT_FOUND'));
+  if (!target.isBot) {
+    throw new HttpError(400, 'CANNOT_REMOVE_HUMAN', localizeErrorCode('CANNOT_REMOVE_HUMAN'));
+  }
+
+  target.difficulty = body.difficulty;
+  touchRoom(room);
+  persistRoom(room);
+  void emitRoom(room);
+  return res.json(sanitizeRoom(room));
 });
 
 roomsRouter.post('/rooms/:roomId/remove-bot', (req, res) => {

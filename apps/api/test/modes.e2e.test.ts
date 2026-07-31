@@ -351,3 +351,89 @@ describe('optional rule: bam', () => {
     expect(room.game.rules.bam).toBe(true);
   });
 });
+
+describe('per-bot difficulty', () => {
+  it('defaults new bots to medium', async () => {
+    const host = await newTable('classic4');
+    const added = await post(`/rooms/${host.roomId}/add-bot`, host);
+    const bot = added.body.players.find((p: any) => p.isBot);
+    expect(bot.difficulty).toBe('medium');
+  });
+
+  it('lets the host pick the level when adding a bot', async () => {
+    const host = await newTable('classic4');
+    const easy = await post(`/rooms/${host.roomId}/add-bot`, { ...host, difficulty: 'easy' });
+    const hard = await post(`/rooms/${host.roomId}/add-bot`, { ...host, difficulty: 'hard' });
+
+    const levels = hard.body.players.filter((p: any) => p.isBot).map((p: any) => p.difficulty);
+    expect(levels).toContain('easy');
+    expect(levels).toContain('hard');
+    expect(easy.status).toBe(200);
+  });
+
+  it('mixes levels at one table', async () => {
+    const host = await newTable('classic4');
+    for (const difficulty of ['easy', 'medium', 'hard']) {
+      await post(`/rooms/${host.roomId}/add-bot`, { ...host, difficulty });
+    }
+    const room = await (await fetch(`${server.url}/rooms/${host.roomId}`)).json();
+    const levels = room.players.filter((p: any) => p.isBot).map((p: any) => p.difficulty);
+    expect(new Set(levels).size).toBe(3);
+  });
+
+  it('lets the host change an existing bot level', async () => {
+    const host = await newTable('classic4');
+    const added = await post(`/rooms/${host.roomId}/add-bot`, host);
+    const botId = added.body.players.find((p: any) => p.isBot).id;
+
+    const changed = await post(`/rooms/${host.roomId}/bot-difficulty`, {
+      ...host,
+      botId,
+      difficulty: 'hard',
+    });
+    expect(changed.status).toBe(200);
+    expect(changed.body.players.find((p: any) => p.id === botId).difficulty).toBe('hard');
+  });
+
+  it('rejects an unknown level', async () => {
+    const host = await newTable('classic4');
+    const added = await post(`/rooms/${host.roomId}/add-bot`, host);
+    const botId = added.body.players.find((p: any) => p.isBot).id;
+
+    const bad = await post(`/rooms/${host.roomId}/bot-difficulty`, {
+      ...host,
+      botId,
+      difficulty: 'impossible',
+    });
+    expect(bad.status).toBe(400);
+  });
+
+  it('refuses level changes from a non-host', async () => {
+    const host = await newTable('classic4');
+    const added = await post(`/rooms/${host.roomId}/add-bot`, host);
+    const botId = added.body.players.find((p: any) => p.isBot).id;
+    const guestRes = await post(`/rooms/${host.roomId}/join`, { name: 'نیکا' });
+
+    const attempt = await post(`/rooms/${host.roomId}/bot-difficulty`, {
+      roomId: host.roomId,
+      playerId: guestRes.body.player.id,
+      token: guestRes.body.token,
+      botId,
+      difficulty: 'easy',
+    });
+    expect(attempt.status).toBe(403);
+  });
+
+  it('refuses to set a difficulty on a human', async () => {
+    const host = await newTable('classic4');
+    const guestRes = await post(`/rooms/${host.roomId}/join`, { name: 'نیکا' });
+
+    const attempt = await post(`/rooms/${host.roomId}/bot-difficulty`, {
+      ...host,
+      botId: guestRes.body.player.id,
+      difficulty: 'hard',
+    });
+    expect(attempt.status).toBe(400);
+    expect(attempt.body.error).toBe('CANNOT_REMOVE_HUMAN');
+  });
+});

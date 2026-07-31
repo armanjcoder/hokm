@@ -1,12 +1,20 @@
 import { getModeConfig } from '@hokm/game-engine';
-import { MODE_OPTIONS, TARGET_SCORE_OPTIONS, type RoomPlayer, type RoomView } from '../types.js';
+import {
+  DIFFICULTY_OPTIONS,
+  MODE_OPTIONS,
+  TARGET_SCORE_OPTIONS,
+  type BotDifficulty,
+  type RoomPlayer,
+  type RoomView,
+} from '../types.js';
 
-export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy, showRules, updateSettings }: {
+export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty, removeBot, leaveRoom, invite, busy, showRules, updateSettings }: {
   room: RoomView;
   me: RoomPlayer | undefined;
   isHost: boolean;
   toggleReady: () => void;
-  addBot: () => void;
+  addBot: (difficulty: BotDifficulty) => void;
+  setBotDifficulty: (botId: string, difficulty: BotDifficulty) => void;
   removeBot: (botId: string) => void;
   leaveRoom: () => void;
   invite: () => void;
@@ -131,9 +139,31 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
                   </em>
                 )}
                 {player?.isBot && isHost && (
-                  <button className="seat-remove" type="button" disabled={busy} onClick={() => removeBot(player.id)}>
-                    حذف ربات
-                  </button>
+                  <div className="bot-controls">
+                    <select
+                      className="bot-difficulty"
+                      aria-label={`سطح سختی ${player.name}`}
+                      value={player.difficulty ?? 'medium'}
+                      disabled={busy}
+                      onChange={(event) =>
+                        setBotDifficulty(player.id, event.target.value as BotDifficulty)
+                      }
+                    >
+                      {DIFFICULTY_OPTIONS.map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button className="seat-remove" type="button" disabled={busy} onClick={() => removeBot(player.id)}>
+                      حذف
+                    </button>
+                  </div>
+                )}
+                {player?.isBot && !isHost && (
+                  <em className="seat-status">
+                    {DIFFICULTY_OPTIONS.find((o) => o.id === (player.difficulty ?? 'medium'))?.label}
+                  </em>
                 )}
               </div>
             </div>
@@ -165,9 +195,22 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
       </div>
 
       {isHost && !seatsFull && (
-        <button className="test-bots-button" type="button" disabled={busy} onClick={addBot}>
-          افزودن یک ربات 🤖
-        </button>
+        <div className="add-bot-row">
+          <span className="settings-label">افزودن ربات با سطح:</span>
+          <div className="add-bot-buttons">
+            {DIFFICULTY_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                className="test-bots-button"
+                type="button"
+                disabled={busy}
+                onClick={() => addBot(option.id)}
+              >
+                {option.label} 🤖
+              </button>
+            ))}
+          </div>
+        </div>
       )}
       {!isHost && !seatsFull && (
         <p className="hint">فقط سازنده میز می‌تواند ربات اضافه یا حذف کند.</p>

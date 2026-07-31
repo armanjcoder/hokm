@@ -1,4 +1,5 @@
 import type { GameMode, HokmGameState, OptionalRules, Seat } from '@hokm/game-engine';
+import type { BotDifficulty } from './game/bot-ai.js';
 import type { RoomStatus } from './room-lifecycle.js';
 
 export interface RoomPlayer {
@@ -11,6 +12,8 @@ export interface RoomPlayer {
   connected: boolean;
   ready?: boolean;
   isBot?: boolean;
+  /** Only set for bots: how strong this opponent plays. */
+  difficulty?: BotDifficulty;
 }
 
 export interface Room {

@@ -28,6 +28,7 @@ function renderLobby(props: Partial<Parameters<typeof Lobby>[0]> = {}) {
     isHost: true,
     toggleReady: noop,
     addBot: noop,
+    setBotDifficulty: noop,
     removeBot: noop,
     leaveRoom: noop,
     invite: noop,
@@ -125,5 +126,53 @@ describe('optional rule toggles', () => {
   it('hides the toggles from non-hosts', () => {
     renderLobby({ isHost: false });
     expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+});
+
+describe('bot difficulty', () => {
+  function withBot(difficulty: 'easy' | 'medium' | 'hard' = 'medium') {
+    return room({
+      players: [
+        { id: 'p0', name: 'آرمان', seat: 0, connected: true, ready: false },
+        { id: 'b1', name: 'ربات نیکا', seat: 1, connected: true, ready: true, isBot: true, difficulty },
+      ],
+    });
+  }
+
+  it('offers all three levels when adding a bot', () => {
+    renderLobby();
+    expect(screen.getByText('آسان 🤖')).toBeDefined();
+    expect(screen.getByText('متوسط 🤖')).toBeDefined();
+    expect(screen.getByText('سخت 🤖')).toBeDefined();
+  });
+
+  it('passes the chosen level when adding', () => {
+    const addBot = vi.fn();
+    renderLobby({ addBot });
+    fireEvent.click(screen.getByText('سخت 🤖'));
+    expect(addBot).toHaveBeenCalledWith('hard');
+  });
+
+  it('shows each bot current level and lets the host change it', () => {
+    const setBotDifficulty = vi.fn();
+    renderLobby({ room: withBot('easy'), setBotDifficulty });
+
+    const select = screen.getByLabelText('سطح سختی ربات نیکا') as HTMLSelectElement;
+    expect(select.value).toBe('easy');
+
+    fireEvent.change(select, { target: { value: 'hard' } });
+    expect(setBotDifficulty).toHaveBeenCalledWith('b1', 'hard');
+  });
+
+  it('shows non-hosts the level as plain text, with no control', () => {
+    renderLobby({ room: withBot('hard'), isHost: false });
+    expect(screen.queryByLabelText('سطح سختی ربات نیکا')).toBeNull();
+    expect(screen.getByText('سخت')).toBeDefined();
+  });
+
+  it('disables the selector while a request is in flight', () => {
+    renderLobby({ room: withBot(), busy: true });
+    const select = screen.getByLabelText('سطح سختی ربات نیکا') as HTMLSelectElement;
+    expect(select.disabled).toBe(true);
   });
 });

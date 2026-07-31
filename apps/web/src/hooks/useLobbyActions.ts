@@ -19,7 +19,8 @@ export interface LobbyActions {
   toggleReady: () => Promise<void>;
   /** Host-only: change the table rules from the lobby. */
   updateSettings: (patch: { mode?: string; targetScore?: number }) => Promise<void>;
-  addBot: () => Promise<void>;
+  addBot: (difficulty: string) => Promise<void>;
+  setBotDifficulty: (botId: string, difficulty: string) => void;
   removeBot: (botId: string) => void;
   leaveRoom: () => Promise<void>;
   /** True while a request is in flight, so buttons can be disabled. */
@@ -65,9 +66,13 @@ export function useLobbyActions({
       if (data?.started) onGameStarted();
     },
 
-    async addBot() {
-      const data = await run('add-bot', {}, 'اضافه کردن ربات انجام نشد.');
+    async addBot(difficulty) {
+      const data = await run('add-bot', { difficulty }, 'اضافه کردن ربات انجام نشد.');
       if (data?.started) onGameStarted();
+    },
+
+    setBotDifficulty(botId, difficulty) {
+      void run('bot-difficulty', { botId, difficulty }, 'تغییر سطح ربات انجام نشد.');
     },
 
     removeBot(botId) {

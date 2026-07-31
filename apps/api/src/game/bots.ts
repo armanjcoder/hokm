@@ -7,13 +7,18 @@ import {
   getValidCards,
   playCard,
   resolveDraw,
-  type Card,
-  type HokmGameState,
   type Seat,
-  type Suit,
 } from '@hokm/game-engine';
 import { randomCode } from '../state.js';
 import type { Room, RoomPlayer } from '../types.js';
+import {
+  chooseCard,
+  chooseDiscards,
+  chooseTrumpSuit,
+  DEFAULT_BOT_DIFFICULTY,
+  shouldKeepDraw,
+  type BotDifficulty,
+} from './bot-ai.js';
 
 /** Test bots so a single player can try a full table. */
 
@@ -22,7 +27,11 @@ export const BOT_NAMES = ['ربات نیکا', 'ربات آرش', 'ربات سا
 /** Safety net against an unexpected engine state looping forever. */
 const MAX_BOT_STEPS = 200;
 
-export function createBot(room: Room, seat: Seat): RoomPlayer {
+export function createBot(
+  room: Room,
+  seat: Seat,
+  difficulty: BotDifficulty = DEFAULT_BOT_DIFFICULTY,
+): RoomPlayer {
   const used = new Set(room.players.filter((p) => p.isBot).map((p) => p.name));
   const name = BOT_NAMES.find((candidate) => !used.has(candidate)) ?? `ربات ${used.size + 1}`;
   return {
@@ -32,7 +41,12 @@ export function createBot(room: Room, seat: Seat): RoomPlayer {
     connected: true,
     ready: true,
     isBot: true,
+    difficulty,
   };
+}
+
+function difficultyOf(player: RoomPlayer): BotDifficulty {
+  return player.difficulty ?? DEFAULT_BOT_DIFFICULTY;
 }
 
 /**
@@ -68,29 +82,36 @@ export function autoAdvanceBots(room: Room): void {
           room.game = requestRedeal(room.game, bot.id);
           continue;
         }
-        room.game = chooseTrump(room.game, bot.id, chooseBotTrump(room.game, bot.seat));
+        room.game = chooseTrump(
+          room.game,
+          bot.id,
+          chooseTrumpSuit(room.game, bot.seat, difficultyOf(bot)),
+        );
         continue;
       }
 
-      // Two player mode: burn the weakest cards, then always keep the draw.
+      // Two player mode: burn the weakest cards, then draw selectively.
       if (room.game.phase === 'discarding') {
         const config = getModeConfig(room.game.mode);
-        const weakest = [...room.game.hands[bot.seat]]
-          .sort((a, b) => botRankValue(a) - botRankValue(b))
-          .slice(0, config.discardCount)
-          .map((card) => card.id);
-        room.game = discardCards(room.game, bot.id, weakest);
+        const burn = chooseDiscards(room.game, bot.seat, config.discardCount, difficultyOf(bot));
+        room.game = discardCards(room.game, bot.id, burn);
         continue;
       }
 
       if (room.game.phase === 'drawing') {
-        if (!room.game.pendingDraw) room.game = drawCard(room.game, bot.id);
-        room.game = resolveDraw(room.game, bot.id, true);
+        if (!room.game.pendingDraw) {
+          room.game = drawCard(room.game, bot.id);
+          continue;
+        }
+        const revealed = room.game.pendingDraw.card;
+        const keep = shouldKeepDraw(revealed, room.game.trumpSuit, difficultyOf(bot));
+        room.game = resolveDraw(room.game, bot.id, keep);
         continue;
       }
 
       if (room.game.phase !== 'playing') return;
-      const card = chooseBotCard(getValidCards(room.game, bot.id));
+      const legal = getValidCards(room.game, bot.id);
+      const card = chooseCard(room.game, bot.seat, legal, difficultyOf(bot));
       if (!card) return;
       room.game = playCard(room.game, bot.id, card.id);
     } catch (error) {
@@ -100,24 +121,3 @@ export function autoAdvanceBots(room: Room): void {
   }
 }
 
-/** Picks the suit the bot holds most strength in. */
-export function chooseBotTrump(game: HokmGameState, seat: Seat): Suit {
-  const suitScores: Record<Suit, number> = { spades: 0, hearts: 0, diamonds: 0, clubs: 0 };
-  for (const card of game.hands[seat]) {
-    suitScores[card.suit] += 10 + botRankValue(card);
-  }
-  return (Object.entries(suitScores).sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'spades') as Suit;
-}
-
-/** Currently a simple strategy: always play the lowest legal card. */
-export function chooseBotCard(cards: Card[]): Card | undefined {
-  return [...cards].sort((a, b) => botRankValue(a) - botRankValue(b))[0];
-}
-
-export function botRankValue(card: Card): number {
-  const values: Record<Card['rank'], number> = {
-    A: 14, K: 13, Q: 12, J: 11, '10': 10, '9': 9,
-    '8': 8, '7': 7, '6': 6, '5': 5, '4': 4, '3': 3, '2': 2,
-  };
-  return values[card.rank];
-}

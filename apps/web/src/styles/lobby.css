@@ -23,3 +23,9 @@
 .rule-toggle span { display: grid; gap: 2px; }
 .rule-toggle strong { font-size: 14px; }
 .rule-toggle small { color: #9a9aad; font-size: 12px; line-height: 1.7; }
+.bot-controls { display: flex; align-items: center; gap: 6px; }
+.bot-difficulty { padding: 3px 6px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.08); color: #f7f7fb; font-family: inherit; font-size: 12px; }
+.bot-difficulty:disabled { opacity: .55; }
+.add-bot-row { display: grid; gap: 6px; margin-top: 10px; }
+.add-bot-buttons { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.add-bot-buttons .test-bots-button { margin-top: 0; font-size: 14px; padding: 12px 6px; }

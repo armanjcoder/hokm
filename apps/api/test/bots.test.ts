@@ -1,6 +1,7 @@
 import { chooseTrump, createGame, getValidCards, playCard, type Card } from '@hokm/game-engine';
 import { describe, expect, it } from 'vitest';
-import { autoAdvanceBots, botRankValue, chooseBotCard, chooseBotTrump, createBot } from '../src/game/bots.js';
+import { autoAdvanceBots, createBot } from '../src/game/bots.js';
+import { chooseCard, chooseTrumpSuit } from '../src/game/bot-ai.js';
 import type { Room } from '../src/types.js';
 
 function seededRng(seed = 11) {
@@ -57,31 +58,15 @@ describe('createBot', () => {
   });
 });
 
-describe('bot card choice', () => {
-  it('ranks ace highest and two lowest', () => {
-    expect(botRankValue(card('A'))).toBeGreaterThan(botRankValue(card('K')));
-    expect(botRankValue(card('2'))).toBeLessThan(botRankValue(card('3')));
-  });
-
-  it('plays the lowest legal card', () => {
-    const chosen = chooseBotCard([card('A'), card('5'), card('K')]);
-    expect(chosen?.rank).toBe('5');
-  });
-
-  it('returns undefined when there is nothing legal to play', () => {
-    expect(chooseBotCard([])).toBeUndefined();
-  });
-});
-
-describe('chooseBotTrump', () => {
-  it('picks the suit the bot holds most strength in', () => {
+describe('chooseTrumpSuit', () => {
+  it('picks the suit the bot is strongest in', () => {
     const game = createGame(
       [0, 1, 2, 3].map((seat) => ({ id: `p${seat}`, name: `p${seat}`, seat: seat as 0 | 1 | 2 | 3 })),
       { rng: seededRng() },
     );
-    // Stack seat 0 with clubs so the answer is unambiguous.
     game.hands[0] = [card('A', 'clubs'), card('K', 'clubs'), card('Q', 'clubs'), card('2', 'hearts')];
-    expect(chooseBotTrump(game, 0)).toBe('clubs');
+    expect(chooseTrumpSuit(game, 0, 'medium')).toBe('clubs');
+    expect(chooseTrumpSuit(game, 0, 'hard')).toBe('clubs');
   });
 });
 
@@ -119,6 +104,7 @@ describe('autoAdvanceBots', () => {
     // Human leads, then the bots should complete the trick automatically.
     const legal = getValidCards(room.game, 'human');
     room.game = playCard(room.game, 'human', legal[0]!.id);
+    void chooseCard;
     autoAdvanceBots(room);
 
     // Trick resolved and the turn is back with a seat that can act.

@@ -2,6 +2,14 @@ import type { GameMode, PublicGameView, Suit } from '@hokm/game-engine';
 
 export type RoomStatus = 'lobby' | 'playing' | 'finished' | 'abandoned';
 
+export type BotDifficulty = 'easy' | 'medium' | 'hard';
+
+export const DIFFICULTY_OPTIONS: Array<{ id: BotDifficulty; label: string }> = [
+  { id: 'easy', label: 'آسان' },
+  { id: 'medium', label: 'متوسط' },
+  { id: 'hard', label: 'سخت' },
+];
+
 export interface RoomPlayer {
   id: string;
   name: string;
@@ -10,6 +18,7 @@ export interface RoomPlayer {
   connected: boolean;
   ready?: boolean;
   isBot?: boolean;
+  difficulty?: BotDifficulty;
 }
 
 export interface Readiness {

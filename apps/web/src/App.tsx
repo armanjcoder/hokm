@@ -169,7 +169,15 @@ export function App() {
     setToast,
   });
 
-  const { toggleReady, updateSettings, addBot, removeBot, leaveRoom, busy: lobbyBusy } = useLobbyActions({
+  const {
+    toggleReady,
+    updateSettings,
+    addBot,
+    setBotDifficulty,
+    removeBot,
+    leaveRoom,
+    busy: lobbyBusy,
+  } = useLobbyActions({
     apiUrl,
     room,
     session,
@@ -251,6 +259,7 @@ export function App() {
           isHost={room.hostPlayerId === session.playerId}
           toggleReady={toggleReady}
           addBot={addBot}
+          setBotDifficulty={setBotDifficulty}
           removeBot={removeBot}
           leaveRoom={leaveRoom}
           busy={lobbyBusy}
