@@ -17,6 +17,15 @@ export const apiRoot = path.resolve(moduleDir, '..');
 
 loadEnv({ path: path.join(apiRoot, '.env') });
 
+/**
+ * Supported proxy schemes for the Telegram-only outbound proxy.
+ *
+ * Declared before `config` because `parseProxyUrl` runs while this module is
+ * still initialising; a `const` further down would be in its temporal dead
+ * zone and crash the server at startup.
+ */
+const PROXY_SCHEMES = new Set(['http:', 'https:', 'socks:', 'socks4:', 'socks4a:', 'socks5:', 'socks5h:']);
+
 const port = Number(process.env.PORT ?? 4000);
 const defaultPublicUrl = `http://localhost:${port}`;
 const webAppUrl = normalizeEnvUrl(process.env.WEB_APP_URL ?? defaultPublicUrl);
@@ -96,8 +105,6 @@ function positiveNumber(value: string | undefined, fallback: number): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
-/** Supported proxy schemes for the Telegram-only outbound proxy. */
-const PROXY_SCHEMES = new Set(['http:', 'https:', 'socks:', 'socks4:', 'socks4a:', 'socks5:', 'socks5h:']);
 
 /**
  * Validates `TELEGRAM_PROXY_URL`. An unusable value is ignored with a warning
