@@ -12,6 +12,8 @@ import { SqliteRoomStore } from './storage.js';
 import { errorBody, localizeErrorCode } from './messages.js';
 import { createPlayerToken, verifyPlayerSession, withoutToken } from './session.js';
 import { telegramDisplayName, verifyInitData, type TelegramUser } from './telegram-auth.js';
+import { RateLimiter } from './rate-limit.js';
+import { sanitizeDisplayName } from './sanitize.js';
 import {
   cleanupAction,
   evaluateReadiness,
@@ -59,6 +61,15 @@ const cleanupPolicy: CleanupPolicy = {
 };
 // Floor keeps the job cheap in production; tests may opt into a faster tick.
 const minCleanupIntervalMs = Number(process.env.ROOM_CLEANUP_MIN_INTERVAL_MS ?? 60_000);
+const maxRooms = Number(process.env.MAX_ROOMS ?? 500);
+const createRoomLimiter = new RateLimiter({
+  windowMs: 60_000,
+  max: Number(process.env.RATE_LIMIT_CREATE_PER_MIN ?? 6),
+});
+const lobbyLimiter = new RateLimiter({
+  windowMs: 60_000,
+  max: Number(process.env.RATE_LIMIT_ACTIONS_PER_MIN ?? 60),
+});
 const cleanupIntervalMs = Math.max(
   Number.isFinite(minCleanupIntervalMs) && minCleanupIntervalMs > 0 ? minCleanupIntervalMs : 60_000,
   hoursToMs(process.env.ROOM_CLEANUP_INTERVAL_HOURS, 1),
@@ -100,7 +111,22 @@ console.log(
 
 const app = express();
 app.use(cors({ origin: corsOriginHandler, credentials: true }));
-app.use(express.json());
+app.use(express.json({ limit: '32kb' }));
+app.set('trust proxy', true);
+
+/** Applies a limiter to a request, throwing a localized 429 when exceeded. */
+function enforceLimit(limiter: RateLimiter, req: express.Request, res: express.Response): boolean {
+  const key = clientKey(req);
+  const verdict = limiter.check(key);
+  if (verdict.allowed) return true;
+  res.setHeader('Retry-After', String(verdict.retryAfterSeconds));
+  res.status(429).json(errorBody('RATE_LIMITED'));
+  return false;
+}
+
+function clientKey(req: express.Request): string {
+  return req.ip ?? req.socket.remoteAddress ?? 'unknown';
+}
 
 app.get('/health', (_req, res) => {
   res.json({ ok: true, service: 'hokm-api', now: new Date().toISOString() });
@@ -113,19 +139,25 @@ app.get('/rooms/:roomId', (req, res) => {
 });
 
 app.post('/rooms', (req, res) => {
+  if (!enforceLimit(createRoomLimiter, req, res)) return;
+  if (rooms.size >= maxRooms) {
+    runRoomCleanup();
+    if (rooms.size >= maxRooms) return res.status(503).json(errorBody('TOO_MANY_ROOMS'));
+  }
   const body = createRoomSchema.parse(req.body);
   const identity = authenticate(body.initData);
-  const room = createRoom(identity.name ?? body.hostName, identity.telegramId);
+  const room = createRoom(sanitizeDisplayName(identity.name ?? body.hostName), identity.telegramId);
   persistRoom(room);
   const host = room.players[0];
   res.status(201).json({ ...sanitizeRoom(room), token: host?.token });
 });
 
 app.post('/rooms/:roomId/join', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
   const room = requireRoom(req.params.roomId);
   const body = joinRoomSchema.parse(req.body);
   const identity = authenticate(body.initData);
-  const player = joinRoom(room, identity.name ?? body.name, identity.telegramId);
+  const player = joinRoom(room, sanitizeDisplayName(identity.name ?? body.name), identity.telegramId);
   maybeStartGame(room);
   persistRoom(room);
   void emitRoom(room);
@@ -134,6 +166,7 @@ app.post('/rooms/:roomId/join', (req, res) => {
 
 // Adds exactly one bot per call so the host can build a 1, 2 or 3 human table.
 app.post('/rooms/:roomId/add-bot', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
   const room = requireRoom(req.params.roomId);
   const body = actorSchema.parse(req.body);
   requireHost(room, body.playerId, body.token);
@@ -151,6 +184,7 @@ app.post('/rooms/:roomId/add-bot', (req, res) => {
 });
 
 app.post('/rooms/:roomId/remove-bot', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
   const room = requireRoom(req.params.roomId);
   const body = removeBotSchema.parse(req.body);
   requireHost(room, body.playerId, body.token);
@@ -171,6 +205,7 @@ app.post('/rooms/:roomId/remove-bot', (req, res) => {
 // Any seated human can toggle their own readiness; the game auto-starts once
 // the table is full and every human is ready.
 app.post('/rooms/:roomId/ready', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
   const room = requireRoom(req.params.roomId);
   const body = readySchema.parse(req.body);
   requireSession(room, body.playerId, body.token);
@@ -188,6 +223,7 @@ app.post('/rooms/:roomId/ready', (req, res) => {
 });
 
 app.post('/rooms/:roomId/leave', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
   const room = requireRoom(req.params.roomId);
   const body = actorSchema.parse(req.body);
   requireSession(room, body.playerId, body.token);
@@ -215,6 +251,9 @@ if (shouldServeWebDist) {
 }
 
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  if (err && typeof err === 'object' && (err as { type?: string }).type === 'entity.too.large') {
+    return res.status(413).json(errorBody('PAYLOAD_TOO_LARGE'));
+  }
   if (err instanceof z.ZodError) {
     return res.status(400).json({ ...errorBody('VALIDATION_ERROR'), details: err.flatten() });
   }
@@ -311,6 +350,37 @@ httpServer.listen(port, () => {
 
 runRoomCleanup();
 setInterval(() => runRoomCleanup(), cleanupIntervalMs).unref();
+
+// sql.js re-serialises the whole database on every save, so the process must
+// not be killed mid-write. Close cleanly on the usual termination signals.
+let shuttingDown = false;
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`Received ${signal}; shutting down cleanly...`);
+
+    const finish = () => {
+      try {
+        roomStore.close();
+      } catch (error) {
+        console.error('Failed to close the database cleanly.', error);
+      }
+      process.exit(0);
+    };
+
+    // Never hang forever if a socket refuses to close.
+    const forceTimer = setTimeout(finish, 5000);
+    forceTimer.unref();
+
+    io.close(() => {
+      httpServer.close(() => {
+        clearTimeout(forceTimer);
+        finish();
+      });
+    });
+  });
+}
 
 // The bot is optional infrastructure: if Telegram is unreachable the game API
 // must keep serving, so failures here are logged instead of crashing the process.

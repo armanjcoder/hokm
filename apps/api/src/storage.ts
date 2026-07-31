@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createRequire } from 'node:module';
 import initSqlJs, { type Database, type SqlJsStatic } from 'sql.js';
@@ -21,9 +21,22 @@ export class SqliteRoomStore {
     const resolvedPath = path.resolve(dbPath);
     mkdirSync(path.dirname(resolvedPath), { recursive: true });
 
-    const db = existsSync(resolvedPath)
-      ? new SQL.Database(readFileSync(resolvedPath))
-      : new SQL.Database();
+    // A corrupt file must not stop the server from booting: back it up and
+    // start fresh rather than crash-looping on every restart.
+    let db: Database;
+    if (existsSync(resolvedPath)) {
+      try {
+        db = new SQL.Database(readFileSync(resolvedPath));
+        db.exec('SELECT 1');
+      } catch (error) {
+        const backupPath = `${resolvedPath}.corrupt-${Date.now()}`;
+        renameSync(resolvedPath, backupPath);
+        console.error(`Database at ${resolvedPath} was unreadable; moved to ${backupPath}.`, error);
+        db = new SQL.Database();
+      }
+    } else {
+      db = new SQL.Database();
+    }
 
     const store = new SqliteRoomStore(db, resolvedPath);
     store.migrate();
@@ -85,8 +98,23 @@ export class SqliteRoomStore {
     this.db.run('CREATE INDEX IF NOT EXISTS idx_rooms_created_at ON rooms(created_at);');
   }
 
+  /**
+   * Writes the database atomically.
+   *
+   * sql.js keeps everything in memory and re-serialises the whole file on every
+   * save, so writing straight to `dbPath` means a crash mid-write truncates the
+   * file and loses every room. Writing to a temp file and renaming makes the
+   * swap atomic on POSIX and Windows.
+   */
   private flush(): void {
-    writeFileSync(this.dbPath, Buffer.from(this.db.export()));
+    const tempPath = `${this.dbPath}.tmp`;
+    try {
+      writeFileSync(tempPath, Buffer.from(this.db.export()));
+      renameSync(tempPath, this.dbPath);
+    } catch (error) {
+      rmSync(tempPath, { force: true });
+      throw error;
+    }
   }
 }
 

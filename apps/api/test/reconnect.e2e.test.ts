@@ -10,11 +10,14 @@ interface JoinAck {
   room?: { id: string; players: Array<{ id: string; seat: number; connected: boolean }> };
 }
 
+/** Tests create far more rooms than a human would; keep limits out of the way. */
+const TEST_LIMITS = { RATE_LIMIT_CREATE_PER_MIN: '10000', RATE_LIMIT_ACTIONS_PER_MIN: '10000' };
+
 let server: ServerHarness;
 const openSockets: Socket[] = [];
 
 beforeAll(async () => {
-  server = await ServerHarness.create();
+  server = await ServerHarness.create(TEST_LIMITS);
   await server.start();
 }, 60000);
 

@@ -1,10 +1,13 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { ServerHarness } from './helpers/server-harness.js';
 
+/** Tests create far more rooms than a human would; keep limits out of the way. */
+const TEST_LIMITS = { RATE_LIMIT_CREATE_PER_MIN: '10000', RATE_LIMIT_ACTIONS_PER_MIN: '10000' };
+
 let server: ServerHarness;
 
 beforeAll(async () => {
-  server = await ServerHarness.create();
+  server = await ServerHarness.create(TEST_LIMITS);
   await server.start();
 }, 60000);
 
@@ -245,6 +248,7 @@ describe('automatic cleanup of stale rooms', () => {
   beforeAll(async () => {
     // Very short TTLs so the periodic job acts within the test.
     cleanupServer = await ServerHarness.create({
+      ...TEST_LIMITS,
       ROOM_LOBBY_TTL_HOURS: '0.0003',
       ROOM_FINISHED_TTL_HOURS: '0.0003',
       ROOM_PLAYING_TTL_HOURS: '0.0003',

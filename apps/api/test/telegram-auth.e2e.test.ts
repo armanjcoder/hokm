@@ -22,10 +22,13 @@ function signInitData(user: object, botToken = BOT_TOKEN, authDate = Math.floor(
 const VICTIM = { id: 111111, first_name: 'آرمان' };
 const ATTACKER = { id: 222222, first_name: 'مهاجم' };
 
+/** Tests create far more rooms than a human would; keep limits out of the way. */
+const TEST_LIMITS = { RATE_LIMIT_CREATE_PER_MIN: '10000', RATE_LIMIT_ACTIONS_PER_MIN: '10000' };
+
 let server: ServerHarness;
 
 beforeAll(async () => {
-  server = await ServerHarness.create({ TELEGRAM_BOT_TOKEN: BOT_TOKEN });
+  server = await ServerHarness.create({ TELEGRAM_BOT_TOKEN: BOT_TOKEN, ...TEST_LIMITS });
   await server.start();
 }, 60000);
 
@@ -136,7 +139,7 @@ describe('guest mode when no bot token is configured', () => {
   let guestServer: ServerHarness;
 
   beforeAll(async () => {
-    guestServer = await ServerHarness.create();
+    guestServer = await ServerHarness.create(TEST_LIMITS);
     await guestServer.start();
   }, 60000);
 
