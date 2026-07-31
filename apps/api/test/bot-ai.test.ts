@@ -231,11 +231,21 @@ describe('choosing trump', () => {
     expect(chooseTrumpSuit(game, 0, 'hard')).toBe('clubs');
   });
 
-  it('easy bots just take their longest suit', () => {
+  it('weighs length more heavily as the level rises', () => {
+    // One lone ace versus four small clubs. Hard and medium value the long
+    // suit; easy leans further towards the single high card.
     const game = state({
-      hands: { 0: [card('A', 'hearts'), card('2', 'clubs'), card('3', 'clubs')] },
+      hands: {
+        0: [
+          card('A', 'hearts'),
+          card('2', 'clubs'),
+          card('3', 'clubs'),
+          card('4', 'clubs'),
+        ],
+      },
     });
-    expect(chooseTrumpSuit(game, 0, 'easy')).toBe('clubs');
+    expect(chooseTrumpSuit(game, 0, 'hard')).toBe('clubs');
+    expect(chooseTrumpSuit(game, 0, 'medium')).toBe('clubs');
   });
 });
 
@@ -265,7 +275,10 @@ describe('two player decisions', () => {
     expect(shouldKeepDraw(card('A', 'hearts'), 'spades', 'hard')).toBe(true);
   });
 
-  it('easy bots keep whatever they draw', () => {
-    expect(shouldKeepDraw(card('2', 'hearts'), 'spades', 'easy')).toBe(true);
+  it('easy bots keep trumps and decent cards, but not junk', () => {
+    expect(shouldKeepDraw(card('2', 'spades'), 'spades', 'easy')).toBe(true);
+    expect(shouldKeepDraw(card('A', 'hearts'), 'spades', 'easy')).toBe(true);
+    // Even the weakest bot no longer hoards a worthless card.
+    expect(shouldKeepDraw(card('2', 'hearts'), 'spades', 'easy')).toBe(false);
   });
 });
