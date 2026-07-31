@@ -1,3 +1,4 @@
+import { getModeConfig } from '@hokm/game-engine';
 import { MODE_OPTIONS, type RoomPlayer, type RoomView } from '../types.js';
 
 export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy, showRules }: {
@@ -14,7 +15,8 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
 }) {
   const readiness = room.readiness;
   const modeLabel = MODE_OPTIONS.find((option) => option.id === (room.mode ?? 'classic4'))?.label ?? '۴ نفره';
-  const totalSeats = room.mode === 'duel2' ? 2 : room.mode === 'solo3' ? 3 : 4;
+  // Seat count comes from the engine so the UI can never drift from the rules.
+  const totalSeats = getModeConfig(room.mode).seats;
   const seatsFull = room.players.length === totalSeats;
   const waiting = readiness?.waitingOn.length ?? 0;
 
