@@ -98,3 +98,32 @@ describe('seat count follows the mode', () => {
     expect(labels).toHaveLength(seats);
   });
 });
+
+describe('optional rule toggles', () => {
+  it('lets the host enable the low hand redeal', () => {
+    const updateSettings = vi.fn();
+    renderLobby({ updateSettings });
+    fireEvent.click(screen.getByText('ده‌لو کم'));
+    expect(updateSettings).toHaveBeenCalledWith({ rules: { lowHandRedeal: true } });
+  });
+
+  it('lets the host enable bam', () => {
+    const updateSettings = vi.fn();
+    renderLobby({ updateSettings });
+    fireEvent.click(screen.getByText('بام'));
+    expect(updateSettings).toHaveBeenCalledWith({ rules: { bam: true } });
+  });
+
+  it('reflects rules that are already on', () => {
+    renderLobby({
+      room: room({ rules: { lowHandRedeal: true, maxRedeals: 2, bam: true } }),
+    });
+    const boxes = screen.getAllByRole('checkbox') as HTMLInputElement[];
+    expect(boxes.every((b) => b.checked)).toBe(true);
+  });
+
+  it('hides the toggles from non-hosts', () => {
+    renderLobby({ isHost: false });
+    expect(screen.queryByRole('checkbox')).toBeNull();
+  });
+});

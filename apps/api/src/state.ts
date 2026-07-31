@@ -65,7 +65,12 @@ export function normalizeLoadedRoom(room: Room): Room {
     // Rooms saved before multi-mode support default to the classic game.
     mode: room.mode ?? 'classic4',
     targetScore: room.targetScore ?? 7,
-    rules: room.rules ?? { lowHandRedeal: false, maxRedeals: 2 },
+    // Older snapshots predate some rule flags, so fill in any that are missing.
+    rules: {
+      lowHandRedeal: room.rules?.lowHandRedeal ?? false,
+      maxRedeals: room.rules?.maxRedeals ?? 2,
+      bam: room.rules?.bam ?? false,
+    },
     players,
     lastActivityAt: room.lastActivityAt ?? room.createdAt,
     ...(hostPlayerId !== undefined ? { hostPlayerId } : {}),

@@ -150,3 +150,22 @@ describe('low hand redeal (ده‌لو کم)', () => {
     expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
   });
 });
+
+describe('bam badge', () => {
+  it('shows a bam as 3 points', () => {
+    renderTable(
+      game({ handScore: { tricks: { 0: 13, 1: 0 }, winningTeam: 0, kind: 'bam', pointsAwarded: 3 } }),
+    );
+    expect(screen.getByText(/بام! همه دست‌ها را برد/)).toBeDefined();
+    expect(screen.getByText('+3 امتیاز')).toBeDefined();
+  });
+
+  it('distinguishes a bam against the hakem', () => {
+    renderTable(
+      game({
+        handScore: { tricks: { 0: 0, 1: 13 }, winningTeam: 1, kind: 'hakem_bam', pointsAwarded: 3 },
+      }),
+    );
+    expect(screen.getByText(/بام روی حاکم/)).toBeDefined();
+  });
+});

@@ -20,6 +20,7 @@ export const targetScoreSchema = z
 
 export const rulesSchema = z.object({
   lowHandRedeal: z.boolean().optional(),
+  bam: z.boolean().optional(),
 });
 
 export const createRoomSchema = z.object({

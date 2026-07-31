@@ -10,6 +10,9 @@ import type { GameMode } from '@hokm/game-engine';
 export const LOW_HAND_RULE =
   'ده‌لو کم: اگر ۵ کارت اول حاکم هیچ کارت عکس‌داری (تک، شاه، بی‌بی، سرباز) نداشت، می‌تواند بخواهد دوباره پخش شود.';
 
+export const BAM_RULE =
+  'بام: بازی بعد از ۷ دست ادامه پیدا می‌کند. هرکس همه دست‌ها را ببرد، همان‌جا کل بازی را می‌برد.';
+
 const GUIDES: Record<GameMode, { title: string; steps: string[]; key: string }> = {
   classic4: {
     title: 'حکم ۴ نفره',
@@ -46,11 +49,13 @@ const GUIDES: Record<GameMode, { title: string; steps: string[]; key: string }> 
 export function RulesGuide({
   mode,
   lowHandRedeal = false,
+  bam = false,
   onClose,
 }: {
   mode: GameMode;
-  /** Only mention the optional rule when this table actually uses it. */
+  /** Only mention the optional rules this table actually uses. */
   lowHandRedeal?: boolean;
+  bam?: boolean;
   onClose: () => void;
 }) {
   const guide = GUIDES[mode] ?? GUIDES.classic4;
@@ -73,6 +78,7 @@ export function RulesGuide({
         </ol>
         <p className="rules-key">{guide.key}</p>
         {lowHandRedeal && <p className="rules-key">{LOW_HAND_RULE}</p>}
+        {bam && <p className="rules-key">{BAM_RULE}</p>}
         <button className="primary full-width" type="button" onClick={onClose}>
           فهمیدم
         </button>

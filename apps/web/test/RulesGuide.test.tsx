@@ -97,3 +97,15 @@ describe('optional rule note', () => {
     expect(screen.getByText(/ده‌لو کم/)).toBeDefined();
   });
 });
+
+describe('bam rule note', () => {
+  it('is hidden when the table does not use bam', () => {
+    render(<RulesGuide mode="classic4" onClose={() => {}} />);
+    expect(screen.queryByText(/^بام:/)).toBeNull();
+  });
+
+  it('is shown when the host enabled bam', () => {
+    render(<RulesGuide mode="classic4" bam onClose={() => {}} />);
+    expect(screen.getByText(/^بام:/)).toBeDefined();
+  });
+});

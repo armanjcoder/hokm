@@ -186,6 +186,7 @@ export function App() {
     <RulesGuide
       mode={rulesFor}
       lowHandRedeal={Boolean(room?.rules?.lowHandRedeal)}
+      bam={Boolean(room?.rules?.bam)}
       onClose={() => setRulesFor(null)}
     />
   ) : null;

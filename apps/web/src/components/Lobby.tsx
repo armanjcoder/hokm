@@ -15,7 +15,7 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
   updateSettings: (patch: {
     mode?: string;
     targetScore?: number;
-    rules?: { lowHandRedeal?: boolean };
+    rules?: { lowHandRedeal?: boolean; bam?: boolean };
   }) => void;
 }) {
   const readiness = room.readiness;
@@ -84,6 +84,19 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
             <span>
               <strong>ده‌لو کم</strong>
               <small>اگر ۵ کارت اول حاکم هیچ کارت عکس‌داری نداشت، می‌تواند بخواهد دوباره پخش شود.</small>
+            </span>
+          </label>
+
+          <label className="rule-toggle">
+            <input
+              type="checkbox"
+              disabled={busy}
+              checked={Boolean(room.rules?.bam)}
+              onChange={(event) => updateSettings({ rules: { bam: event.target.checked } })}
+            />
+            <span>
+              <strong>بام</strong>
+              <small>بازی بعد از ۷ دست ادامه پیدا می‌کند؛ هرکس همه دست‌ها را ببرد، کل بازی را برده.</small>
             </span>
           </label>
 

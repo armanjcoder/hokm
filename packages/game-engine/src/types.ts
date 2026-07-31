@@ -50,7 +50,7 @@ export interface HandScore {
   tricks: Record<TeamId, number>;
   pointsAwarded?: number;
   winningTeam?: TeamId;
-  kind?: 'normal' | 'kot' | 'hakem_kot';
+  kind?: 'normal' | 'kot' | 'hakem_kot' | 'bam' | 'hakem_bam';
 }
 
 export interface HokmGameState {
@@ -97,6 +97,11 @@ export interface OptionalRules {
   lowHandRedeal: boolean;
   /** Maximum consecutive redeals, so a table cannot lock up. */
   maxRedeals: number;
+  /**
+   * "بام": play continues past the winning trick count, and sweeping every
+   * trick wins the whole match outright.
+   */
+  bam: boolean;
 }
 
 export interface CreateGameOptions {

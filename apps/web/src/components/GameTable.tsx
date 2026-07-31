@@ -215,6 +215,8 @@ function ScoreBadge({ handScore }: { handScore: PublicGameView['handScore'] }) {
     normal: { text: 'برد عادی', className: 'normal' },
     kot: { text: 'کوت! حریف هیچ دستی نبرد', className: 'kot' },
     hakem_kot: { text: 'حاکم‌کوت! حاکم هیچ دستی نبرد', className: 'hakem-kot' },
+    bam: { text: 'بام! همه دست‌ها را برد', className: 'bam' },
+    hakem_bam: { text: 'بام روی حاکم! همه دست‌ها را برد', className: 'bam' },
   } as const;
   const label = labels[kind];
 

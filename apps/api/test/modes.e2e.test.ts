@@ -316,3 +316,38 @@ describe('optional rule: low hand redeal', () => {
     expect(typeof room.game.canRequestRedeal).toBe('boolean');
   });
 });
+
+describe('optional rule: bam', () => {
+  it('is off by default', async () => {
+    const host = await newTable('classic4');
+    expect(host.body.rules.bam).toBe(false);
+  });
+
+  it('can be toggled independently of the redeal rule', async () => {
+    const host = await newTable('classic4');
+    await post(`/rooms/${host.roomId}/settings`, { ...host, rules: { lowHandRedeal: true } });
+    const withBam = await post(`/rooms/${host.roomId}/settings`, { ...host, rules: { bam: true } });
+
+    // Turning one on must not turn the other off.
+    expect(withBam.body.rules.lowHandRedeal).toBe(true);
+    expect(withBam.body.rules.bam).toBe(true);
+  });
+
+  it('carries into the started game', async () => {
+    const created = await post('/rooms', {
+      hostName: 'آرمان',
+      mode: 'duel2',
+      rules: { bam: true },
+    });
+    const host = {
+      roomId: created.body.id as string,
+      playerId: created.body.players[0].id as string,
+      token: created.body.token as string,
+    };
+    await post(`/rooms/${host.roomId}/add-bot`, host);
+    await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+
+    const room = await (await fetch(`${server.url}/rooms/${host.roomId}`)).json();
+    expect(room.game.rules.bam).toBe(true);
+  });
+});

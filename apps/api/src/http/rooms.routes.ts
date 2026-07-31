@@ -32,11 +32,15 @@ import { persistRoom, requireRoom, rooms, touchRoom } from '../state.js';
 import { createRoomLimiter, enforceLimit, lobbyLimiter } from './middleware.js';
 
 /** Applies only the rule flags a client actually sent. */
-function mergeRules(base: OptionalRules, patch: { lowHandRedeal?: boolean | undefined } | undefined): OptionalRules {
+function mergeRules(
+  base: OptionalRules,
+  patch: { lowHandRedeal?: boolean | undefined; bam?: boolean | undefined } | undefined,
+): OptionalRules {
   if (!patch) return base;
   return {
     ...base,
     ...(patch.lowHandRedeal !== undefined ? { lowHandRedeal: patch.lowHandRedeal } : {}),
+    ...(patch.bam !== undefined ? { bam: patch.bam } : {}),
   };
 }
 

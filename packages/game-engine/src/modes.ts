@@ -24,6 +24,8 @@ export interface ModeConfig {
   removedTwos: number;
   /** Tricks needed to win a hand. */
   tricksToWin: number;
+  /** Total tricks in a hand, i.e. the hand size. */
+  totalTricks: number;
   /** Two player only: cards each side discards after trump is named. */
   discardCount: number;
   /** Two player only: alternating draw phase after discarding. */
@@ -44,6 +46,7 @@ const CONFIGS: Record<GameMode, ModeConfig> = {
     followUpDeals: [4, 4],
     removedTwos: 0,
     tricksToWin: 7,
+    totalTricks: 13,
     discardCount: 0,
     usesDrawPhase: false,
   },
@@ -58,6 +61,7 @@ const CONFIGS: Record<GameMode, ModeConfig> = {
     followUpDeals: [4, 4, 4],
     removedTwos: 1,
     tricksToWin: 7,
+    totalTricks: 17,
     discardCount: 0,
     usesDrawPhase: false,
   },
@@ -72,6 +76,7 @@ const CONFIGS: Record<GameMode, ModeConfig> = {
     followUpDeals: [],
     removedTwos: 0,
     tricksToWin: 7,
+    totalTricks: 13,
     discardCount: 2,
     usesDrawPhase: true,
   },

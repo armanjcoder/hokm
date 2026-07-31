@@ -206,9 +206,20 @@ export function playCard(state: HokmGameState, playerId: string, cardId: string)
   tricks[winningTeam] = (tricks[winningTeam] ?? 0) + 1;
   const handScore: HandScore = { tricks };
 
-  const handWinner = teamsOf(config).find((team) => (tricks[team] ?? 0) >= config.tricksToWin);
-  if (handWinner !== undefined) {
-    return finishHand({ ...state, hands, completedTricks, currentTrick: completedTrick, handScore }, handWinner);
+  const reachedTarget = teamsOf(config).find((team) => (tricks[team] ?? 0) >= config.tricksToWin);
+  const allTricksPlayed = completedTricks.length >= config.totalTricks;
+
+  // Without the bam rule a hand stops the moment someone reaches the target.
+  // With it, play continues so a side can still sweep every trick.
+  const stopNow = state.rules.bam
+    ? allTricksPlayed || (reachedTarget !== undefined && !canStillSweep(tricks, config, reachedTarget))
+    : reachedTarget !== undefined;
+
+  if (stopNow && reachedTarget !== undefined) {
+    return finishHand(
+      { ...state, hands, completedTricks, currentTrick: completedTrick, handScore },
+      reachedTarget,
+    );
   }
 
   return {
@@ -220,6 +231,22 @@ export function playCard(state: HokmGameState, playerId: string, cardId: string)
     currentTurnSeat: winnerSeat,
     lastEvent: `دست را ${getPlayerBySeat(state, winnerSeat).name} گرفت.`,
   };
+}
+
+/**
+ * True while the leading side could still win every trick of the hand.
+ * Once any opponent has taken a trick a bam is impossible, so there is no
+ * reason to keep playing a decided hand.
+ */
+function canStillSweep(
+  tricks: Record<number, number>,
+  config: ReturnType<typeof getModeConfig>,
+  leader: number,
+): boolean {
+  const takenByOthers = teamsOf(config)
+    .filter((team) => team !== leader)
+    .reduce((sum, team) => sum + (tricks[team] ?? 0), 0);
+  return takenByOthers === 0;
 }
 
 export function continueToNextHand(state: HokmGameState, rng: () => number = Math.random): HokmGameState {

@@ -12,6 +12,7 @@ export function emptyTrickScore(config: ModeConfig): Record<TeamId, number> {
 export const DEFAULT_RULES: OptionalRules = {
   lowHandRedeal: false,
   maxRedeals: 2,
+  bam: false,
 };
 
 export function startNewHand(input: {
@@ -75,18 +76,49 @@ export function finishHand(state: HokmGameState, winningTeam: TeamId): HokmGameS
   // A "kot" means every opponent finished the hand without taking a trick.
   const opponentsShutOut = otherTeams.every((team) => (state.handScore.tricks[team] ?? 0) === 0);
 
-  const kind: NonNullable<HandScore['kind']> = opponentsShutOut
+  // A "bam" is a clean sweep of every trick in the hand.
+  const sweptEveryTrick =
+    state.rules.bam && (state.handScore.tricks[winningTeam] ?? 0) >= config.totalTricks;
+
+  const kind: NonNullable<HandScore['kind']> = sweptEveryTrick
     ? winningTeam === hakemTeam
-      ? 'kot'
-      : 'hakem_kot'
-    : 'normal';
-  const pointsAwarded = kind === 'hakem_kot' ? 3 : kind === 'kot' ? 2 : 1;
+      ? 'bam'
+      : 'hakem_bam'
+    : opponentsShutOut
+      ? winningTeam === hakemTeam
+        ? 'kot'
+        : 'hakem_kot'
+      : 'normal';
+
+  const POINTS: Record<NonNullable<HandScore['kind']>, number> = {
+    normal: 1,
+    kot: 2,
+    hakem_kot: 3,
+    bam: 3,
+    hakem_bam: 3,
+  };
+  const pointsAwarded = POINTS[kind];
 
   const matchScore = { ...state.matchScore };
   matchScore[winningTeam] = (matchScore[winningTeam] ?? 0) + pointsAwarded;
-  const phase = (matchScore[winningTeam] ?? 0) >= state.targetScore ? 'game_complete' : 'hand_complete';
+
+  // A bam ends the entire match immediately, whatever the score is.
+  const isBam = kind === 'bam' || kind === 'hakem_bam';
+  const phase =
+    isBam || (matchScore[winningTeam] ?? 0) >= state.targetScore ? 'game_complete' : 'hand_complete';
 
   const label = winnerLabel(state, winningTeam, config);
+  if (isBam) {
+    return {
+      ...state,
+      phase,
+      currentTurnSeat: state.currentTrick.winnerSeat ?? state.currentTurnSeat,
+      handScore: { ...state.handScore, winningTeam, kind, pointsAwarded },
+      matchScore,
+      lastEvent: `${label} بام کرد و کل بازی را برد!`,
+    };
+  }
+
   return {
     ...state,
     phase,

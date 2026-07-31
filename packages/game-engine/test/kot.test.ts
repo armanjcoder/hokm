@@ -37,7 +37,7 @@ function stateWith(mode: GameMode, hakemSeat: Seat, tricks: Record<TeamId, numbe
     matchScore,
     targetScore: 7,
     roundNumber: 1,
-    rules: { lowHandRedeal: false, maxRedeals: 2 },
+    rules: { lowHandRedeal: false, maxRedeals: 2, bam: false },
     redealCount: 0,
     canRequestRedeal: false,
   };
