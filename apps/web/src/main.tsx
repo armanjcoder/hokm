@@ -2,6 +2,16 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { io, type Socket } from 'socket.io-client';
 import type { Card, PublicGameView, Suit } from '@hokm/game-engine';
+import {
+  buildInviteLink,
+  HokmRequestError,
+  normalizeApiUrl,
+  parseJoinInput,
+  parseStoredSession,
+  socketPayload,
+  userMessage,
+  type StoredSession,
+} from './lib.js';
 import './styles.css';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL || defaultApiUrl();
@@ -38,7 +48,6 @@ interface RoomView {
   players: RoomPlayer[];
   game?: PublicGameView;
 }
-interface StoredSession { roomId: string; playerId: string; apiUrl: string; token?: string }
 type ConnectionStatus = 'connecting' | 'connected' | 'offline';
 /**
  * `idle`     -> a saved session exists but we have not tried to use it yet
@@ -708,31 +717,6 @@ function suitSymbol(suit: Suit) {
   return suits.find((s) => s.id === suit)?.symbol ?? '؟';
 }
 
-/** Only the fields the server expects; never leaks apiUrl into the payload. */
-function socketPayload(session: StoredSession) {
-  return {
-    roomId: session.roomId,
-    playerId: session.playerId,
-    ...(session.token ? { token: session.token } : {}),
-  };
-}
-
-class HokmRequestError extends Error {
-  constructor(public code: string, message: string) {
-    super(message);
-    this.name = 'HokmRequestError';
-  }
-}
-
-/**
- * Only shows a server message when it is actually Persian; otherwise falls back
- * to our own Persian text so raw English codes never reach the player.
- */
-function userMessage(payload: any, fallback: string): string {
-  const message = typeof payload?.message === 'string' ? payload.message.trim() : '';
-  return message && /[\u0600-\u06FF]/.test(message) ? message : fallback;
-}
-
 function defaultApiUrl(): string {
   if (location.hostname === 'localhost' && location.port === '5173') {
     return 'http://localhost:4000';
@@ -751,22 +735,6 @@ function resolveInitialApiUrl(): string {
   return normalizeApiUrl(localStorage.getItem('hokm.apiUrl') || DEFAULT_API_URL);
 }
 
-function normalizeApiUrl(url: string): string {
-  return url.trim().replace(/\/$/, '');
-}
-
-function parseJoinInput(input: string): { roomId: string; apiUrl?: string } {
-  const trimmed = input.trim();
-  if (!trimmed) return { roomId: '' };
-  try {
-    const url = new URL(trimmed);
-    const apiUrl = url.searchParams.get('api') ?? undefined;
-    return { roomId: url.searchParams.get('room') ?? trimmed, ...(apiUrl ? { apiUrl } : {}) };
-  } catch {
-    return { roomId: trimmed };
-  }
-}
-
 function saveSession(session: StoredSession) {
   localStorage.setItem('hokm.session', JSON.stringify(session));
   localStorage.setItem('hokm.apiUrl', session.apiUrl);
@@ -775,15 +743,10 @@ function clearSession() {
   localStorage.removeItem('hokm.session');
 }
 function readSession(apiUrl: string): StoredSession | null {
-  try {
-    const session = JSON.parse(localStorage.getItem('hokm.session') ?? 'null') as StoredSession | null;
-    return session ? { ...session, apiUrl: session.apiUrl || apiUrl } : null;
-  } catch {
-    return null;
-  }
+  return parseStoredSession(localStorage.getItem('hokm.session'), apiUrl);
 }
 function shareRoom(roomId: string, apiUrl: string) {
-  const link = `${location.origin}${location.pathname}?room=${encodeURIComponent(roomId)}&api=${encodeURIComponent(apiUrl)}`;
+  const link = buildInviteLink(location.origin, location.pathname, roomId, apiUrl);
   if (navigator.share) void navigator.share({ title: 'میز حکم', text: 'بیا حکم بازی کنیم', url: link });
   else void navigator.clipboard.writeText(link);
 }
