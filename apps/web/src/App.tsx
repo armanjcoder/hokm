@@ -183,7 +183,11 @@ export function App() {
   // The rules guide must be reachable from every screen, including the landing
   // page before any room exists, so it is rendered alongside each branch.
   const rulesOverlay = rulesFor ? (
-    <RulesGuide mode={rulesFor} onClose={() => setRulesFor(null)} />
+    <RulesGuide
+      mode={rulesFor}
+      lowHandRedeal={Boolean(room?.rules?.lowHandRedeal)}
+      onClose={() => setRulesFor(null)}
+    />
   ) : null;
 
   // Re-joining a saved table: show progress instead of a blank screen.

@@ -85,3 +85,15 @@ describe('TopBar help button', () => {
     expect(showRules).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('optional rule note', () => {
+  it('is hidden when the table does not use the redeal rule', () => {
+    render(<RulesGuide mode="classic4" onClose={() => {}} />);
+    expect(screen.queryByText(/ده‌لو کم/)).toBeNull();
+  });
+
+  it('is shown when the host enabled it', () => {
+    render(<RulesGuide mode="classic4" lowHandRedeal onClose={() => {}} />);
+    expect(screen.getByText(/ده‌لو کم/)).toBeDefined();
+  });
+});

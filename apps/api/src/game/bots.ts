@@ -1,6 +1,7 @@
 import {
   chooseTrump,
   discardCards,
+  requestRedeal,
   drawCard,
   getModeConfig,
   getValidCards,
@@ -62,6 +63,11 @@ export function autoAdvanceBots(room: Room): void {
     // in a half-updated state; stop advancing and let humans continue instead.
     try {
       if (room.game.phase === 'waiting_for_trump') {
+        // A weak hand is a real disadvantage, so take the redeal when offered.
+        if (room.game.canRequestRedeal) {
+          room.game = requestRedeal(room.game, bot.id);
+          continue;
+        }
         room.game = chooseTrump(room.game, bot.id, chooseBotTrump(room.game, bot.seat));
         continue;
       }

@@ -6,6 +6,10 @@ import type { GameMode } from '@hokm/game-engine';
  * Deliberately terse: a player opens this mid-lobby and needs the gist in a few
  * seconds, not a manual. Only what differs or decides the game is listed.
  */
+/** Shown under every guide when the host enabled the optional redeal rule. */
+export const LOW_HAND_RULE =
+  'ده‌لو کم: اگر ۵ کارت اول حاکم هیچ کارت عکس‌داری (تک، شاه، بی‌بی، سرباز) نداشت، می‌تواند بخواهد دوباره پخش شود.';
+
 const GUIDES: Record<GameMode, { title: string; steps: string[]; key: string }> = {
   classic4: {
     title: 'حکم ۴ نفره',
@@ -39,7 +43,16 @@ const GUIDES: Record<GameMode, { title: string; steps: string[]; key: string }> 
   },
 };
 
-export function RulesGuide({ mode, onClose }: { mode: GameMode; onClose: () => void }) {
+export function RulesGuide({
+  mode,
+  lowHandRedeal = false,
+  onClose,
+}: {
+  mode: GameMode;
+  /** Only mention the optional rule when this table actually uses it. */
+  lowHandRedeal?: boolean;
+  onClose: () => void;
+}) {
   const guide = GUIDES[mode] ?? GUIDES.classic4;
 
   return (
@@ -59,6 +72,7 @@ export function RulesGuide({ mode, onClose }: { mode: GameMode; onClose: () => v
           ))}
         </ol>
         <p className="rules-key">{guide.key}</p>
+        {lowHandRedeal && <p className="rules-key">{LOW_HAND_RULE}</p>}
         <button className="primary full-width" type="button" onClick={onClose}>
           فهمیدم
         </button>
