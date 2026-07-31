@@ -37,3 +37,4 @@
 .draw-decision { display: grid; justify-items: center; gap: 12px; }
 .draw-actions { display: flex; gap: 10px; }
 .draw-decision small { color: #a8a8ba; line-height: 1.7; font-size: 12px; }
+.target-note { color: #8fe8d5; }

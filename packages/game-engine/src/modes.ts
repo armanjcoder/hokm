@@ -113,3 +113,12 @@ export function suitsToTrim(config: ModeConfig, trumpSuit: Suit | undefined, ord
 }
 
 export const TRIMMED_RANK: Rank = '2';
+
+/** Target scores a host may pick for a match. */
+export const TARGET_SCORES = [3, 5, 7, 11] as const;
+export type TargetScore = (typeof TARGET_SCORES)[number];
+export const DEFAULT_TARGET_SCORE: TargetScore = 7;
+
+export function isTargetScore(value: unknown): value is TargetScore {
+  return typeof value === 'number' && (TARGET_SCORES as readonly number[]).includes(value);
+}

@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { GAME_MODES } from '@hokm/game-engine';
+import { DEFAULT_TARGET_SCORE, GAME_MODES, TARGET_SCORES } from '@hokm/game-engine';
 import type { GameMode, Suit } from '@hokm/game-engine';
 import { MAX_NAME_LENGTH } from './sanitize.js';
 
@@ -11,9 +11,17 @@ const token = z.string().min(1).optional();
 
 export const modeSchema: z.ZodType<GameMode> = z.enum(GAME_MODES);
 
+/** Only a fixed set of target scores is allowed, so a client cannot pick 9999. */
+export const targetScoreSchema = z
+  .number()
+  .refine((value): value is number => (TARGET_SCORES as readonly number[]).includes(value), {
+    message: 'Unsupported target score.',
+  });
+
 export const createRoomSchema = z.object({
   hostName: playerName.default('بازیکن'),
   mode: modeSchema.default('classic4'),
+  targetScore: targetScoreSchema.default(DEFAULT_TARGET_SCORE),
   initData,
 });
 
@@ -29,6 +37,12 @@ export const actorSchema = z.object({
 });
 
 export const removeBotSchema = actorSchema.extend({ botId: z.string().min(1) });
+
+/** Host-only lobby settings; each field is optional so one can change alone. */
+export const settingsSchema = actorSchema.extend({
+  mode: modeSchema.optional(),
+  targetScore: targetScoreSchema.optional(),
+});
 export const readySchema = actorSchema.extend({ ready: z.boolean().default(true) });
 
 export const suitSchema: z.ZodType<Suit> = z.enum(['spades', 'hearts', 'diamonds', 'clubs']);

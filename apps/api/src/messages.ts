@@ -36,6 +36,7 @@ export const ERROR_MESSAGES_FA: Record<string, string> = {
   INVALID_DISCARD: 'تعداد کارت‌هایی که انتخاب کردی درست نیست.',
   DRAW_PENDING: 'اول درباره کارتی که رو شده تصمیم بگیر.',
   EMPTY_STOCK: 'دسته کارت تمام شده است.',
+  TOO_MANY_PLAYERS: 'تعداد بازیکنان بیشتر از ظرفیت این حالت است. اول یک نفر باید خارج شود.',
   NOT_HOST: 'فقط سازنده میز می‌تواند این کار را انجام دهد.',
   PLAYERS_NOT_READY: 'همه بازیکنان هنوز آماده نشده‌اند.',
   ROOM_ABANDONED: 'این میز رها شده است. یک میز جدید بساز.',

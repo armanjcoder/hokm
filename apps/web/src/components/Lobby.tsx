@@ -1,7 +1,7 @@
 import { getModeConfig } from '@hokm/game-engine';
-import { MODE_OPTIONS, type RoomPlayer, type RoomView } from '../types.js';
+import { MODE_OPTIONS, TARGET_SCORE_OPTIONS, type RoomPlayer, type RoomView } from '../types.js';
 
-export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy, showRules }: {
+export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy, showRules, updateSettings }: {
   room: RoomView;
   me: RoomPlayer | undefined;
   isHost: boolean;
@@ -12,6 +12,7 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
   invite: () => void;
   busy: boolean;
   showRules: () => void;
+  updateSettings: (patch: { mode?: string; targetScore?: number }) => void;
 }) {
   const readiness = room.readiness;
   const modeLabel = MODE_OPTIONS.find((option) => option.id === (room.mode ?? 'classic4'))?.label ?? '۴ نفره';
@@ -31,6 +32,52 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
       <button className="link-button" type="button" onClick={showRules}>
         قوانین حکم {modeLabel} را نشانم بده
       </button>
+
+      {isHost && (
+        <section className="table-settings">
+          <h3>تنظیمات میز</h3>
+
+          <span className="settings-label" id="lobby-mode-label">حالت بازی</span>
+          <div className="mode-picker" role="radiogroup" aria-labelledby="lobby-mode-label">
+            {MODE_OPTIONS.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                role="radio"
+                aria-checked={(room.mode ?? 'classic4') === option.id}
+                disabled={busy}
+                className={`mode-option ${(room.mode ?? 'classic4') === option.id ? 'is-active' : ''}`}
+                onClick={() => updateSettings({ mode: option.id })}
+              >
+                <strong>{option.label}</strong>
+              </button>
+            ))}
+          </div>
+
+          <span className="settings-label" id="lobby-score-label">بازی تا چند امتیاز؟</span>
+          <div className="mode-picker score-picker" role="radiogroup" aria-labelledby="lobby-score-label">
+            {TARGET_SCORE_OPTIONS.map((score) => (
+              <button
+                key={score}
+                type="button"
+                role="radio"
+                aria-checked={(room.targetScore ?? 7) === score}
+                disabled={busy}
+                className={`mode-option ${(room.targetScore ?? 7) === score ? 'is-active' : ''}`}
+                onClick={() => updateSettings({ targetScore: score })}
+              >
+                <strong>{score}</strong>
+              </button>
+            ))}
+          </div>
+          <small className="settings-hint">با تغییر حالت بازی، آمادگی همه دوباره صفر می‌شود.</small>
+        </section>
+      )}
+      {!isHost && (
+        <p className="hint">
+          بازی تا {room.targetScore ?? 7} امتیاز. فقط سازنده میز می‌تواند تنظیمات را عوض کند.
+        </p>
+      )}
 
       <div className="seat-grid">
         {Array.from({ length: totalSeats }, (_, seat) => seat).map((seat) => {

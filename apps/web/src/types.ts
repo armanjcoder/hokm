@@ -25,10 +25,13 @@ export const MODE_OPTIONS: Array<{ id: GameMode; label: string; hint: string }> 
   { id: 'duel2', label: '۲ نفره', hint: 'دونفره با سوزاندن و برداشتن' },
 ];
 
+export const TARGET_SCORE_OPTIONS = [3, 5, 7, 11] as const;
+
 export interface RoomView {
   id: string;
   code: string;
   mode?: GameMode;
+  targetScore?: number;
   status: RoomStatus;
   hostPlayerId?: string;
   readiness?: Readiness;

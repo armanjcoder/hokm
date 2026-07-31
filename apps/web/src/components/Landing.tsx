@@ -1,12 +1,13 @@
 import type { GameMode } from '@hokm/game-engine';
 import type { StoredSession } from '../lib.js';
-import { MODE_OPTIONS } from '../types.js';
+import { MODE_OPTIONS, TARGET_SCORE_OPTIONS } from '../types.js';
 
 export function Landing(props: {
   name: string; setName: (name: string) => void; joinCode: string; setJoinCode: (code: string) => void;
   apiUrl: string; setApiUrl: (url: string) => void; loading: boolean; createRoom: () => void; joinRoom: () => void; toast: string;
   savedSession: StoredSession | null; linkedRoomId: string; resumeSession: () => void; clearSavedSession: () => void;
   mode: GameMode; setMode: (mode: GameMode) => void; showRules: () => void;
+  targetScore: number; setTargetScore: (score: number) => void;
 }) {
   const linkPointsElsewhere = Boolean(props.linkedRoomId) && props.linkedRoomId !== props.savedSession?.roomId;
   return (
@@ -49,6 +50,22 @@ export function Landing(props: {
             </button>
           ))}
         </div>
+        <label id="target-label">بازی تا چند امتیاز؟</label>
+        <div className="mode-picker score-picker" role="radiogroup" aria-labelledby="target-label">
+          {TARGET_SCORE_OPTIONS.map((score) => (
+            <button
+              key={score}
+              type="button"
+              role="radio"
+              aria-checked={props.targetScore === score}
+              className={`mode-option ${props.targetScore === score ? 'is-active' : ''}`}
+              onClick={() => props.setTargetScore(score)}
+            >
+              <strong>{score}</strong>
+            </button>
+          ))}
+        </div>
+
         <button className="link-button" type="button" onClick={props.showRules}>
           قوانین این حالت را بلد نیستم
         </button>

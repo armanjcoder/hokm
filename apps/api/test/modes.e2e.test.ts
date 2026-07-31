@@ -146,3 +146,96 @@ describe('dealing per mode', () => {
     }
   });
 });
+
+describe('target score and host settings', () => {
+  it('defaults to seven points', async () => {
+    const host = await newTable('classic4');
+    expect(host.body.targetScore).toBe(7);
+  });
+
+  it.each([3, 5, 7, 11])('accepts %i as a target score', async (score) => {
+    const created = await post('/rooms', { hostName: 'آرمان', targetScore: score });
+    expect(created.body.targetScore).toBe(score);
+  });
+
+  it('rejects an unsupported target score', async () => {
+    const created = await post('/rooms', { hostName: 'آرمان', targetScore: 9999 });
+    expect(created.status).toBe(400);
+    expect(created.body.error).toBe('VALIDATION_ERROR');
+  });
+
+  it('lets the host change the target score from the lobby', async () => {
+    const host = await newTable('classic4');
+    const updated = await post(`/rooms/${host.roomId}/settings`, { ...host, targetScore: 5 });
+    expect(updated.status).toBe(200);
+    expect(updated.body.targetScore).toBe(5);
+  });
+
+  it('refuses settings changes from a non-host', async () => {
+    const host = await newTable('classic4');
+    const guestRes = await post(`/rooms/${host.roomId}/join`, { name: 'نیکا' });
+    const guest = {
+      roomId: host.roomId,
+      playerId: guestRes.body.player.id as string,
+      token: guestRes.body.token as string,
+    };
+
+    const attempt = await post(`/rooms/${host.roomId}/settings`, { ...guest, targetScore: 3 });
+    expect(attempt.status).toBe(403);
+    expect(attempt.body.error).toBe('NOT_HOST');
+  });
+
+  it('resizes the table and drops surplus bots when the mode changes', async () => {
+    const host = await newTable('classic4');
+    for (let i = 0; i < 3; i += 1) await post(`/rooms/${host.roomId}/add-bot`, host);
+
+    const switched = await post(`/rooms/${host.roomId}/settings`, { ...host, mode: 'duel2' });
+    expect(switched.status).toBe(200);
+    expect(switched.body.mode).toBe('duel2');
+    // Two seats only: the host plus one bot.
+    expect(switched.body.players).toHaveLength(2);
+    expect(switched.body.players.map((p: any) => p.seat)).toEqual([0, 1]);
+  });
+
+  it('refuses a mode that cannot fit the humans already seated', async () => {
+    const host = await newTable('classic4');
+    await post(`/rooms/${host.roomId}/join`, { name: 'نیکا' });
+    await post(`/rooms/${host.roomId}/join`, { name: 'آرش' });
+
+    const attempt = await post(`/rooms/${host.roomId}/settings`, { ...host, mode: 'duel2' });
+    expect(attempt.status).toBe(400);
+    expect(attempt.body.error).toBe('TOO_MANY_PLAYERS');
+    expect(attempt.body.message).toMatch(/[\u0600-\u06FF]/);
+  });
+
+  it('clears readiness when the mode changes so nobody starts unaware', async () => {
+    const host = await newTable('classic4');
+    await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+
+    const switched = await post(`/rooms/${host.roomId}/settings`, { ...host, mode: 'solo3' });
+    expect(switched.body.readiness.waitingOn).toContain(host.playerId);
+    expect(switched.body.status).toBe('lobby');
+  });
+
+  it('actually plays to the chosen target, not a hard-coded seven', async () => {
+    const host = await newTable('duel2');
+    await post(`/rooms/${host.roomId}/settings`, { ...host, targetScore: 3 });
+    await post(`/rooms/${host.roomId}/add-bot`, host);
+    await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+
+    // The engine must have been handed the room's target score.
+    const room = await (await fetch(`${server.url}/rooms/${host.roomId}`)).json();
+    expect(room.game.targetScore).toBe(3);
+  });
+
+  it('keeps the chosen target score after the game starts', async () => {
+    const host = await newTable('duel2');
+    await post(`/rooms/${host.roomId}/settings`, { ...host, targetScore: 3 });
+    await post(`/rooms/${host.roomId}/add-bot`, host);
+    await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+
+    const room = await (await fetch(`${server.url}/rooms/${host.roomId}`)).json();
+    expect(room.status).toBe('playing');
+    expect(room.targetScore).toBe(3);
+  });
+});

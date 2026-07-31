@@ -17,6 +17,8 @@ interface Options {
 
 export interface LobbyActions {
   toggleReady: () => Promise<void>;
+  /** Host-only: change the table rules from the lobby. */
+  updateSettings: (patch: { mode?: string; targetScore?: number }) => Promise<void>;
   addBot: () => Promise<void>;
   removeBot: (botId: string) => void;
   leaveRoom: () => Promise<void>;
@@ -55,6 +57,11 @@ export function useLobbyActions({
 
     async toggleReady() {
       const data = await run('ready', { ready: !me?.ready }, 'ثبت آمادگی انجام نشد.');
+      if (data?.started) onGameStarted();
+    },
+
+    async updateSettings(patch) {
+      const data = await run('settings', patch, 'تغییر تنظیمات میز انجام نشد.');
       if (data?.started) onGameStarted();
     },
 

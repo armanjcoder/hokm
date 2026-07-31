@@ -64,20 +64,42 @@ describe('rules guide availability', () => {
 });
 
 describe('mode picker', () => {
+  /** The landing page has two radio groups: game mode and target score. */
+  const modeRadios = () =>
+    screen.getAllByRole('radio').filter((r) => /نفره/.test(r.textContent ?? ''));
+
   it('marks exactly one mode as selected', () => {
     render(<App />);
-    const radios = screen.getAllByRole('radio');
-    expect(radios).toHaveLength(3);
-    expect(radios.filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+    expect(modeRadios()).toHaveLength(3);
+    expect(modeRadios().filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
 
     fireEvent.click(screen.getByText('۳ نفره'));
-    const after = screen.getAllByRole('radio');
-    expect(after.filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
+    expect(modeRadios().filter((r) => r.getAttribute('aria-checked') === 'true')).toHaveLength(1);
   });
 
   it('defaults to the four player game', () => {
     render(<App />);
-    const selected = screen.getAllByRole('radio').find((r) => r.getAttribute('aria-checked') === 'true');
+    const selected = modeRadios().find((r) => r.getAttribute('aria-checked') === 'true');
     expect(selected?.textContent).toContain('۴ نفره');
+  });
+});
+
+describe('target score picker', () => {
+  const scoreRadios = () =>
+    screen.getAllByRole('radio').filter((r) => /^(۳|3|5|7|11)$/.test((r.textContent ?? '').trim()));
+
+  it('offers 3, 5, 7 and 11 and defaults to 7', () => {
+    render(<App />);
+    const scores = scoreRadios();
+    expect(scores.map((r) => r.textContent?.trim())).toEqual(['3', '5', '7', '11']);
+    const selected = scores.find((r) => r.getAttribute('aria-checked') === 'true');
+    expect(selected?.textContent?.trim()).toBe('7');
+  });
+
+  it('lets the host pick a shorter match', () => {
+    render(<App />);
+    fireEvent.click(screen.getByText('5'));
+    const selected = scoreRadios().find((r) => r.getAttribute('aria-checked') === 'true');
+    expect(selected?.textContent?.trim()).toBe('5');
   });
 });

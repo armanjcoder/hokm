@@ -14,3 +14,7 @@
 .ready-button.is-ready { color: #d8f7ee; background: rgba(0,212,170,.16); border: 1px solid rgba(0,212,170,.45); box-shadow: none; }
 .ghost.danger { color: #ff9db0; border-color: rgba(255,84,112,.35); }
 .hint { margin-top: 10px; font-size: 13px; color: #9a9aad; text-align: center; }
+.table-settings { display: grid; gap: 8px; margin: 14px 0; padding: 14px; border-radius: 22px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.09); }
+.table-settings h3 { margin: 0 0 2px; font-size: 15px; }
+.settings-label { color: #a8a8ba; font-size: 13px; }
+.settings-hint { color: #9a9aad; font-size: 12px; line-height: 1.7; }

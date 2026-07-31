@@ -18,6 +18,8 @@ export interface Room {
   code: string;
   /** Which Hokm variant this table plays. */
   mode: GameMode;
+  /** Points needed to win the match. */
+  targetScore: number;
   status: RoomStatus;
   createdAt: string;
   lastActivityAt?: string;

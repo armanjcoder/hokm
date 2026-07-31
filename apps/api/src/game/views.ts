@@ -34,6 +34,7 @@ export function sanitizeRoom(room: Room) {
           matchScore: room.game.matchScore,
           roundNumber: room.game.roundNumber,
           mode: room.game.mode,
+          targetScore: room.game.targetScore,
           stockCount: room.game.stock?.length ?? 0,
           lastEvent: room.game.lastEvent,
         }

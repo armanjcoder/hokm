@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Seat } from '@hokm/game-engine';
+import { getModeConfig, type Seat } from '@hokm/game-engine';
 import { authenticate } from '../auth.js';
 import { config } from '../config.js';
 import { HttpError } from '../errors.js';
@@ -25,6 +25,7 @@ import {
   joinRoomSchema,
   readySchema,
   removeBotSchema,
+  settingsSchema,
 } from '../schemas.js';
 import { persistRoom, requireRoom, rooms, touchRoom } from '../state.js';
 import { createRoomLimiter, enforceLimit, lobbyLimiter } from './middleware.js';
@@ -50,6 +51,7 @@ roomsRouter.post('/rooms', (req, res) => {
     sanitizeDisplayName(identity.name ?? body.hostName),
     identity.telegramId,
     body.mode,
+    body.targetScore,
   );
   persistRoom(room);
 
@@ -69,6 +71,42 @@ roomsRouter.post('/rooms/:roomId/join', (req, res) => {
   void emitRoom(room);
 
   return res.json({ room: sanitizeRoom(room), player, token: player.token });
+});
+
+// Host-only table settings. Changing the mode resizes the table, so any bots
+// that no longer fit are dropped and everyone must confirm readiness again.
+roomsRouter.post('/rooms/:roomId/settings', (req, res) => {
+  if (!enforceLimit(lobbyLimiter, req, res)) return;
+  const room = requireRoom(req.params.roomId);
+  const body = settingsSchema.parse(req.body);
+  requireHost(room, body.playerId, body.token);
+  requireLobby(room);
+
+  if (body.targetScore !== undefined) room.targetScore = body.targetScore;
+
+  if (body.mode !== undefined && body.mode !== room.mode) {
+    room.mode = body.mode;
+    const seats = getModeConfig(room.mode).seats;
+
+    // Keep humans (they chose to be here) and trim bots that no longer fit.
+    const humans = room.players.filter((player) => !player.isBot);
+    if (humans.length > seats) {
+      throw new HttpError(400, 'TOO_MANY_PLAYERS', localizeErrorCode('TOO_MANY_PLAYERS'));
+    }
+    const bots = room.players.filter((player) => player.isBot).slice(0, seats - humans.length);
+    room.players = [...humans, ...bots].map((player, index) => ({
+      ...player,
+      seat: index as Seat,
+      // Changing the rules invalidates earlier consent to start.
+      ready: player.isBot ? true : false,
+    }));
+  }
+
+  touchRoom(room);
+  const started = maybeStartGame(room);
+  persistRoom(room);
+  void emitRoom(room);
+  return res.json({ ...sanitizeRoom(room), started });
 });
 
 // Adds exactly one bot per call so the host can build a 1, 2 or 3 human table.

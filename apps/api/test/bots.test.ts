@@ -16,6 +16,7 @@ function soloRoom(): Room {
     id: 'r1',
     code: 'ABCDE',
     mode: 'classic4',
+    targetScore: 7,
     status: 'lobby',
     createdAt: '2026-07-30T00:00:00.000Z',
     hostPlayerId: 'human',

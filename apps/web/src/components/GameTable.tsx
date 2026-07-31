@@ -200,6 +200,7 @@ function RoundInfo({ game, hakemName }: { game: PublicGameView; hakemName: strin
       <span>راند {game.roundNumber}</span>
       <strong>{game.trumpSuit ? suitSymbol(game.trumpSuit) : '؟'}</strong>
       <small>حاکم: {hakemName}</small>
+      <small className="target-note">تا {game.targetScore} امتیاز</small>
     </div>
   );
 }

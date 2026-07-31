@@ -47,6 +47,7 @@ export function App() {
   const [connection, setConnection] = useState<ConnectionStatus>('connecting');
   const [starting, setStarting] = useState(false);
   const [mode, setMode] = useState<GameMode>('classic4');
+  const [targetScore, setTargetScore] = useState(7);
   const [rulesFor, setRulesFor] = useState<GameMode | null>(null);
   const autoJoinAttempted = useRef(false);
 
@@ -106,7 +107,7 @@ export function App() {
   async function createRoom() {
     setLoading(true);
     try {
-      const nextRoom = await createRoomRequest(apiUrl, name, initData, mode);
+      const nextRoom = await createRoomRequest(apiUrl, name, initData, mode, targetScore);
       const player = nextRoom.players[0];
       activateSession({ roomId: nextRoom.id, playerId: player.id, apiUrl, token: nextRoom.token });
       setRoom(nextRoom);
@@ -168,7 +169,7 @@ export function App() {
     setToast,
   });
 
-  const { toggleReady, addBot, removeBot, leaveRoom, busy: lobbyBusy } = useLobbyActions({
+  const { toggleReady, updateSettings, addBot, removeBot, leaveRoom, busy: lobbyBusy } = useLobbyActions({
     apiUrl,
     room,
     session,
@@ -217,6 +218,8 @@ export function App() {
           mode={mode}
           setMode={setMode}
           showRules={() => setRulesFor(mode)}
+          targetScore={targetScore}
+          setTargetScore={setTargetScore}
           savedSession={savedSession}
           linkedRoomId={new URLSearchParams(location.search).get('room') ?? ''}
           resumeSession={resumeSession}
@@ -248,6 +251,7 @@ export function App() {
           busy={lobbyBusy}
           invite={() => shareRoom(room.id, apiUrl)}
           showRules={() => setRulesFor(room.mode ?? 'classic4')}
+          updateSettings={updateSettings}
         />
       )}
       {room.status === 'abandoned' && (

@@ -26,10 +26,16 @@ async function post(url: string, body: unknown, fallbackMessage: string): Promis
   return data;
 }
 
-export function createRoomRequest(apiUrl: string, hostName: string, initData: string, mode: string) {
+export function createRoomRequest(
+  apiUrl: string,
+  hostName: string,
+  initData: string,
+  mode: string,
+  targetScore: number,
+) {
   return post(
     `${apiUrl}/rooms`,
-    { hostName, mode, ...(initData ? { initData } : {}) },
+    { hostName, mode, targetScore, ...(initData ? { initData } : {}) },
     'ساخت میز انجام نشد. بک‌اند یا آدرس API را چک کن.',
   );
 }
