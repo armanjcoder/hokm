@@ -1,0 +1,28 @@
+/* Landing screen, hero card and resume-session card. */
+
+.landing { min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+.hero-card { width: min(520px, 100%); padding: 28px; border: 1px solid rgba(255,255,255,.13); border-radius: 34px; background: rgba(13, 13, 25, .72); box-shadow: 0 24px 80px rgba(0,0,0,.45); backdrop-filter: blur(22px); }
+.brand { display: inline-flex; gap: 10px; align-items: center; padding: 10px 14px; border-radius: 999px; background: rgba(255,255,255,.08); color: #d9d5ff; font-weight: 800; }
+.brand span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: linear-gradient(135deg, #7c5cff, #00d4aa); }
+h1 { margin: 24px 0 10px; font-size: clamp(32px, 9vw, 58px); line-height: 1.05; letter-spacing: -1.6px; }
+p { color: #b9b9c7; line-height: 1.9; }
+label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
+.actions-grid { display: grid; gap: 12px; margin-top: 18px; }
+.primary { color: white; background: linear-gradient(135deg, #7c5cff, #00b894); border-radius: 18px; padding: 14px 18px; font-weight: 800; box-shadow: 0 14px 34px rgba(124, 92, 255, .28); }
+.ghost { color: #f7f7fb; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); border-radius: 18px; padding: 14px 18px; font-weight: 700; }
+.join-box { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.join-box button { color: #0b0b12; background: #f7f7fb; border-radius: 16px; padding: 0 18px; font-weight: 800; }
+.advanced-settings { margin-top: 14px; padding: 13px; border-radius: 20px; background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.09); }
+.advanced-settings summary { cursor: pointer; color: #d9d5ff; font-weight: 800; }
+.advanced-settings small { display: block; margin-top: 8px; color: #aaaabc; line-height: 1.7; direction: rtl; }
+
+/* Resume previous table */
+.resume-card { width: 100%; max-width: 460px; margin-bottom: 16px; padding: 20px; border-radius: 28px; background: linear-gradient(145deg, rgba(0,212,170,.16), rgba(0,212,170,.05)); border: 1px solid rgba(0,212,170,.32); }
+.resume-card h2 { margin: 0 0 6px; font-size: 19px; }
+.resume-card p { margin: 0 0 12px; font-size: 14px; color: #b9b9c9; line-height: 1.7; }
+.resume-actions { display: grid; grid-template-columns: 1fr auto; gap: 10px; }
+.room-id { display: block; direction: ltr; text-align: center; font-size: 13px; letter-spacing: .5px; padding: 9px 12px; margin-bottom: 12px; border-radius: 14px; background: rgba(0,0,0,.28); color: #8fe8d5; word-break: break-all; }
+.resume-screen { text-align: center; }
+.resume-screen h1 { font-size: 21px; margin: 14px 0 8px; }
+.spinner { width: 42px; height: 42px; margin: 8px auto 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.14); border-top-color: #00d4aa; animation: spin .9s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }

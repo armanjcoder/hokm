@@ -1,0 +1,32 @@
+/* Game table: score strip, played cards, hand and trump picker. */
+
+.table-wrap { position: relative; flex: 1; display: flex; flex-direction: column; min-height: calc(100vh - 92px); gap: 12px; }
+.score-strip { display: grid; grid-template-columns: 1fr 1.25fr 1fr; gap: 10px; }
+.score, .round-info { border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.065); border-radius: 24px; padding: 12px; text-align: center; }
+.score { display: grid; gap: 2px; }
+.score small, .score span, .round-info small { color: #aaaabc; }
+.score strong { font-size: 28px; }
+.round-info { display: grid; place-items: center; gap: 2px; }
+.round-info strong { font-size: 28px; }
+.table-center { flex: 1; min-height: 260px; border-radius: 34px; border: 1px solid rgba(255,255,255,.1); background: radial-gradient(circle, rgba(0,184,148,.18), rgba(255,255,255,.035)); display: grid; place-items: center; align-content: center; gap: 18px; padding: 18px; }
+.turn-badge { padding: 10px 14px; border-radius: 999px; background: rgba(0,0,0,.32); color: #e8e8f1; font-weight: 800; }
+.played-cards { min-height: 104px; display: flex; justify-content: center; align-items: center; gap: 10px; flex-wrap: wrap; }
+.hand { position: sticky; bottom: 0; z-index: 2; margin: 0 -14px -14px; padding: 18px 14px 22px; background: linear-gradient(180deg, transparent, rgba(7,7,12,.92) 22%); display: flex; gap: 8px; overflow-x: auto; direction: ltr; }
+.card { direction: ltr; flex: 0 0 62px; height: 92px; border-radius: 16px; background: linear-gradient(145deg, #fff, #dcdce8); color: #0f1018; box-shadow: 0 14px 24px rgba(0,0,0,.28); display: grid; align-content: space-between; padding: 9px; text-align: left; transition: transform .16s ease, filter .16s ease; }
+.card:not(:disabled):hover { transform: translateY(-8px) rotate(-1deg); }
+.card.red { color: #e11d48; }
+.card.black { color: #111827; }
+.card span { font-weight: 900; font-size: 17px; }
+.card b { font-size: 28px; line-height: 1; justify-self: end; }
+.card.compact { flex-basis: 58px; height: 84px; transform: none; }
+.trump-picker { position: absolute; inset: auto 10px 148px 10px; z-index: 5; padding: 18px; text-align: center; }
+.trump-picker h3 { margin: 0 0 14px; }
+.trump-picker div { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.trump-picker button { min-height: 76px; border-radius: 22px; background: rgba(255,255,255,.92); display: grid; place-items: center; gap: 2px; font-weight: 800; }
+.trump-picker button { color: #111827; }
+.trump-picker button.red { color: #e11d48; }
+.trump-picker button span:first-child { font-size: 30px; line-height: 1; }
+.trump-picker button span:last-child { font-size: 13px; font-weight: 700; }
+.wait-card, .result-card { padding: 18px; text-align: center; }
+.result-card { position: absolute; z-index: 6; inset: 26% 14px auto; }
+.toast { position: fixed; z-index: 10; left: 14px; right: 14px; bottom: 18px; padding: 14px 16px; border-radius: 18px; color: #fff; background: rgba(18,18,28,.94); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 14px 38px rgba(0,0,0,.4); }

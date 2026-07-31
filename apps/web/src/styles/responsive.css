@@ -1,0 +1,9 @@
+/* Wider screens. */
+
+@media (min-width: 760px) {
+  .app-shell { max-width: 980px; margin: 0 auto; }
+  .hand { justify-content: center; }
+  .card { flex-basis: 72px; height: 106px; }
+  .trump-picker { max-width: 540px; margin: auto; }
+}
+.full-width { width: 100%; }

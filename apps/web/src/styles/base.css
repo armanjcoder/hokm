@@ -1,0 +1,21 @@
+/* Design tokens, resets and shared primitives. */
+
+@import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;700;800&display=swap');
+
+:root {
+  font-family: 'Vazirmatn', ui-sans-serif, system-ui;
+  color: #f7f7fb;
+  background: #07070c;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; overflow-x: hidden; background:
+  radial-gradient(circle at 10% 10%, rgba(125, 92, 255, .34), transparent 30%),
+  radial-gradient(circle at 90% 0%, rgba(0, 212, 170, .18), transparent 26%),
+  linear-gradient(145deg, #080810, #11111d 52%, #08080d); }
+button, input { font: inherit; }
+button { border: 0; cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .42; }
+input { width: 100%; border: 1px solid rgba(255,255,255,.12); color: #fff; background: rgba(255,255,255,.07); border-radius: 18px; padding: 14px 16px; outline: none; transition: .2s; }
+input:focus { border-color: rgba(131, 113, 255, .8); box-shadow: 0 0 0 4px rgba(131, 113, 255, .14); }

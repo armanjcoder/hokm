@@ -1,0 +1,16 @@
+/* Lobby: seats, readiness and host controls. */
+
+/* Lobby readiness */
+.seat-card.ready { border-color: rgba(0, 212, 170, .45); background: linear-gradient(145deg, rgba(0,212,170,.14), rgba(255,255,255,.04)); }
+.seat-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; min-height: 24px; }
+.seat-status.is-ready { color: #6ee7c4; }
+.host-tag { margin-inline-start: 8px; padding: 2px 8px; border-radius: 999px; font-size: 11px; font-weight: 600; background: rgba(255,255,255,.12); color: #d8d8e6; }
+.seat-remove { padding: 4px 10px; border: 1px solid rgba(255,84,112,.35); border-radius: 999px; background: rgba(255,84,112,.12); color: #ff9db0; font-size: 12px; font-family: inherit; cursor: pointer; }
+.seat-remove:hover { background: rgba(255,84,112,.2); }
+
+.ready-status { margin: 14px 0 10px; padding: 10px 14px; border-radius: 16px; background: rgba(255,255,255,.05); font-size: 14px; line-height: 1.7; text-align: center; color: #c9c9d8; }
+.ready-button { width: 100%; padding: 15px; margin-bottom: 12px; border: 0; border-radius: 20px; font-family: inherit; font-size: 16px; font-weight: 700; cursor: pointer; color: #05131a; background: linear-gradient(135deg, #00d4aa, #37e0b6); box-shadow: 0 12px 30px rgba(0,212,170,.28); transition: transform .15s ease, box-shadow .2s ease; }
+.ready-button:active { transform: scale(.98); }
+.ready-button.is-ready { color: #d8f7ee; background: rgba(0,212,170,.16); border: 1px solid rgba(0,212,170,.45); box-shadow: none; }
+.ghost.danger { color: #ff9db0; border-color: rgba(255,84,112,.35); }
+.hint { margin-top: 10px; font-size: 13px; color: #9a9aad; text-align: center; }
