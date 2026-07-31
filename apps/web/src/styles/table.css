@@ -30,3 +30,10 @@
 .wait-card, .result-card { padding: 18px; text-align: center; }
 .result-card { position: absolute; z-index: 6; inset: 26% 14px auto; }
 .toast { position: fixed; z-index: 10; left: 14px; right: 14px; bottom: 18px; padding: 14px 16px; border-radius: 18px; color: #fff; background: rgba(18,18,28,.94); border: 1px solid rgba(255,255,255,.12); box-shadow: 0 14px 38px rgba(0,0,0,.4); }
+
+.card.selected { outline: 3px solid #00d4aa; outline-offset: 2px; transform: translateY(-10px); }
+.phase-card { display: grid; gap: 10px; }
+.phase-card h3 { margin: 0; }
+.draw-decision { display: grid; justify-items: center; gap: 12px; }
+.draw-actions { display: flex; gap: 10px; }
+.draw-decision small { color: #a8a8ba; line-height: 1.7; font-size: 12px; }

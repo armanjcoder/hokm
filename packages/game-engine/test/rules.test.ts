@@ -288,10 +288,10 @@ describe('playing a full hand', () => {
       game = playTrick(game);
       tricks += 1;
     }
-    const total = game.handScore.tricks[0] + game.handScore.tricks[1];
+    const total = (game.handScore.tricks[0] ?? 0) + (game.handScore.tricks[1] ?? 0);
     expect(total).toBe(tricks);
     // A hand ends as soon as a team reaches 7 tricks.
-    expect(Math.max(game.handScore.tricks[0], game.handScore.tricks[1])).toBe(7);
+    expect(Math.max(game.handScore.tricks[0] ?? 0, game.handScore.tricks[1] ?? 0)).toBe(7);
     expect(['hand_complete', 'game_complete']).toContain(game.phase);
   });
 
@@ -327,7 +327,7 @@ describe('scoring rules', () => {
     const { winningTeam, kind, pointsAwarded } = game.handScore;
     expect(winningTeam).toBeDefined();
     const loser = winningTeam === 0 ? 1 : 0;
-    if (game.handScore.tricks[loser] > 0) {
+    if ((game.handScore.tricks[loser] ?? 0) > 0) {
       expect(kind).toBe('normal');
       expect(pointsAwarded).toBe(1);
     }

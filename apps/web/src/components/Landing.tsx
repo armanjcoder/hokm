@@ -1,9 +1,12 @@
+import type { GameMode } from '@hokm/game-engine';
 import type { StoredSession } from '../lib.js';
+import { MODE_OPTIONS } from '../types.js';
 
 export function Landing(props: {
   name: string; setName: (name: string) => void; joinCode: string; setJoinCode: (code: string) => void;
   apiUrl: string; setApiUrl: (url: string) => void; loading: boolean; createRoom: () => void; joinRoom: () => void; toast: string;
   savedSession: StoredSession | null; linkedRoomId: string; resumeSession: () => void; clearSavedSession: () => void;
+  mode: GameMode; setMode: (mode: GameMode) => void; showRules: () => void;
 }) {
   const linkPointsElsewhere = Boolean(props.linkedRoomId) && props.linkedRoomId !== props.savedSession?.roomId;
   return (
@@ -29,6 +32,26 @@ export function Landing(props: {
         <p>میز ۴ نفره بساز، دوستات رو دعوت کن، حکم کن و دست‌ها رو ببر 👑</p>
         <label>اسم نمایشی</label>
         <input value={props.name} onChange={(e) => props.setName(e.target.value)} maxLength={40} />
+
+        <label id="mode-label">حالت بازی</label>
+        <div className="mode-picker" role="radiogroup" aria-labelledby="mode-label">
+          {MODE_OPTIONS.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              role="radio"
+              aria-checked={props.mode === option.id}
+              className={`mode-option ${props.mode === option.id ? 'is-active' : ''}`}
+              onClick={() => props.setMode(option.id)}
+            >
+              <strong>{option.label}</strong>
+              <small>{option.hint}</small>
+            </button>
+          ))}
+        </div>
+        <button className="link-button" type="button" onClick={props.showRules}>
+          قوانین این حالت را بلد نیستم
+        </button>
         <details className="advanced-settings">
           <summary>تنظیم بک‌اند محلی</summary>
           <label>آدرس HTTPS بک‌اند / Cloudflare Tunnel</label>

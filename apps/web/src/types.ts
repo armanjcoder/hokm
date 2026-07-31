@@ -1,4 +1,4 @@
-import type { PublicGameView, Suit } from '@hokm/game-engine';
+import type { GameMode, PublicGameView, Suit } from '@hokm/game-engine';
 
 export type RoomStatus = 'lobby' | 'playing' | 'finished' | 'abandoned';
 
@@ -19,9 +19,16 @@ export interface Readiness {
   canStart: boolean;
 }
 
+export const MODE_OPTIONS: Array<{ id: GameMode; label: string; hint: string }> = [
+  { id: 'classic4', label: '۴ نفره', hint: 'دو تیم دو نفره' },
+  { id: 'solo3', label: '۳ نفره', hint: 'هرکس برای خودش' },
+  { id: 'duel2', label: '۲ نفره', hint: 'دونفره با سوزاندن و برداشتن' },
+];
+
 export interface RoomView {
   id: string;
   code: string;
+  mode?: GameMode;
   status: RoomStatus;
   hostPlayerId?: string;
   readiness?: Readiness;

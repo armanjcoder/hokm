@@ -1,10 +1,17 @@
-import { cardRankValue, createDeck, getTeamBySeat, HokmError, shuffle, SUITS } from '../cards.js';
-import type { Card, HandScore, HokmGameState, Player, Seat, Suit, TeamId } from '../types.js';
+import { cardRankValue, createDeck, HokmError, shuffle, SUITS } from '../cards.js';
+import { getModeConfig, suitsToTrim, teamOfSeat, teamsOf, TRIMMED_RANK, type ModeConfig } from '../modes.js';
+import type { Card, GameMode, HandScore, HokmGameState, Player, Seat, Suit, TeamId } from '../types.js';
 
 const suits = SUITS;
 
+/** Zeroed trick counters for every team a mode uses. */
+export function emptyTrickScore(config: ModeConfig): Record<TeamId, number> {
+  return Object.fromEntries(teamsOf(config).map((team) => [team, 0])) as Record<TeamId, number>;
+}
+
 export function startNewHand(input: {
   id: string;
+  mode: GameMode;
   players: Player[];
   hakemSeat: Seat;
   matchScore: Record<TeamId, number>;
@@ -12,19 +19,21 @@ export function startNewHand(input: {
   roundNumber: number;
   rng: (() => number) | undefined;
 }): HokmGameState {
+  const config = getModeConfig(input.mode);
   const deck = shuffle(createDeck(), input.rng);
   const hands = emptyHands();
   let deckIndex = 0;
 
-  // Opening deal: five cards to each player, starting from hakem. Hakem chooses trump after seeing these cards.
-  for (let offset = 0; offset < 4; offset += 1) {
-    const seat = ((input.hakemSeat + offset) % 4) as Seat;
-    hands[seat].push(...deck.slice(deckIndex, deckIndex + 5));
-    deckIndex += 5;
+  // Opening deal, starting from hakem. Hakem chooses trump after seeing these.
+  for (let offset = 0; offset < config.seats; offset += 1) {
+    const seat = ((input.hakemSeat + offset) % config.seats) as Seat;
+    hands[seat].push(...deck.slice(deckIndex, deckIndex + config.initialDeal));
+    deckIndex += config.initialDeal;
   }
 
   return {
     id: input.id,
+    mode: input.mode,
     players: input.players,
     phase: 'waiting_for_trump',
     hakemSeat: input.hakemSeat,
@@ -32,38 +41,75 @@ export function startNewHand(input: {
     hands: sortHands(hands),
     currentTrick: { leaderSeat: input.hakemSeat, plays: [] },
     completedTricks: [],
-    handScore: { tricks: { 0: 0, 1: 0 } },
+    handScore: { tricks: emptyTrickScore(config) },
     matchScore: input.matchScore,
     targetScore: input.targetScore,
     roundNumber: input.roundNumber,
+    // Everything after the opening deal is dealt once trump is known.
+    stock: deck.slice(deckIndex),
     lastEvent: `راند ${input.roundNumber} شروع شد. حاکم باید حکم کند.`,
   };
 }
 
 export function finishHand(state: HokmGameState, winningTeam: TeamId): HokmGameState {
-  const hakemTeam = getTeamBySeat(state.hakemSeat);
-  const loserTeam = winningTeam === 0 ? 1 : 0;
-  const loserTricks = state.handScore.tricks[loserTeam as TeamId];
-  const kind: NonNullable<HandScore['kind']> = loserTricks === 0
-    ? winningTeam === hakemTeam ? 'kot' : 'hakem_kot'
+  const config = getModeConfig(state.mode);
+  const hakemTeam = teamOfSeat(state.hakemSeat, config);
+  const otherTeams = teamsOf(config).filter((team) => team !== winningTeam);
+  // A "kot" means every opponent finished the hand without taking a trick.
+  const opponentsShutOut = otherTeams.every((team) => (state.handScore.tricks[team] ?? 0) === 0);
+
+  const kind: NonNullable<HandScore['kind']> = opponentsShutOut
+    ? winningTeam === hakemTeam
+      ? 'kot'
+      : 'hakem_kot'
     : 'normal';
   const pointsAwarded = kind === 'hakem_kot' ? 3 : kind === 'kot' ? 2 : 1;
-  const matchScore = {
-    0: state.matchScore[0] + (winningTeam === 0 ? pointsAwarded : 0),
-    1: state.matchScore[1] + (winningTeam === 1 ? pointsAwarded : 0),
-  } satisfies Record<TeamId, number>;
-  const phase = matchScore[winningTeam] >= state.targetScore ? 'game_complete' : 'hand_complete';
 
+  const matchScore = { ...state.matchScore };
+  matchScore[winningTeam] = (matchScore[winningTeam] ?? 0) + pointsAwarded;
+  const phase = (matchScore[winningTeam] ?? 0) >= state.targetScore ? 'game_complete' : 'hand_complete';
+
+  const label = winnerLabel(state, winningTeam, config);
   return {
     ...state,
     phase,
     currentTurnSeat: state.currentTrick.winnerSeat ?? state.currentTurnSeat,
     handScore: { ...state.handScore, winningTeam, kind, pointsAwarded },
     matchScore,
-    lastEvent: phase === 'game_complete'
-      ? `تیم ${winningTeam + 1} کل بازی را برد.`
-      : `تیم ${winningTeam + 1} راند را با ${pointsAwarded} امتیاز برد.`,
+    lastEvent:
+      phase === 'game_complete'
+        ? `${label} کل بازی را برد.`
+        : `${label} راند را با ${pointsAwarded} امتیاز برد.`,
   };
+}
+
+/** In team play we name the team; otherwise the individual player. */
+function winnerLabel(state: HokmGameState, team: TeamId, config: ModeConfig): string {
+  if (config.teamPlay) return `تیم ${team + 1}`;
+  return state.players.find((player) => player.seat === team)?.name ?? `بازیکن ${team + 1}`;
+}
+
+/**
+ * Removes low cards so the deck divides evenly between players.
+ * The trump suit is never trimmed so trump strength is unaffected.
+ */
+export function trimDeckForMode(
+  cards: Card[],
+  config: ModeConfig,
+  trumpSuit: Suit | undefined,
+): { kept: Card[]; removed: Card[] } {
+  const targets = new Set(suitsToTrim(config, trumpSuit, suits));
+  if (targets.size === 0) return { kept: cards, removed: [] };
+
+  const removed: Card[] = [];
+  const kept = cards.filter((card) => {
+    if (card.rank === TRIMMED_RANK && targets.has(card.suit) && !removed.some((r) => r.suit === card.suit)) {
+      removed.push(card);
+      return false;
+    }
+    return true;
+  });
+  return { kept, removed };
 }
 
 export function emptyHands(): Record<Seat, Card[]> {
@@ -78,15 +124,19 @@ export function sortHands(hands: Record<Seat, Card[]>): Record<Seat, Card[]> {
   const suitOrder = new Map<Suit, number>(suits.map((suit, index) => [suit, index]));
   const sorted = cloneHands(hands);
   for (const seat of [0, 1, 2, 3] as Seat[]) {
-    sorted[seat].sort((a, b) => (suitOrder.get(a.suit) ?? 0) - (suitOrder.get(b.suit) ?? 0) || cardRankValue(b) - cardRankValue(a));
+    sorted[seat].sort(
+      (a, b) => (suitOrder.get(a.suit) ?? 0) - (suitOrder.get(b.suit) ?? 0) || cardRankValue(b) - cardRankValue(a),
+    );
   }
   return sorted;
 }
 
-export function validateEveryHandHas13Cards(hands: Record<Seat, Card[]>): void {
-  for (const seat of [0, 1, 2, 3] as Seat[]) {
-    if (hands[seat].length !== 13) {
-      throw new HokmError(`Seat ${seat} has ${hands[seat].length} cards.`, 'INVALID_DEAL');
+/** Confirms every seated player ended up with the hand size the mode expects. */
+export function validateDeal(hands: Record<Seat, Card[]>, config: ModeConfig): void {
+  for (let seat = 0; seat < config.seats; seat += 1) {
+    const count = hands[seat as Seat].length;
+    if (count !== config.handSize) {
+      throw new HokmError(`Seat ${seat} has ${count} cards.`, 'INVALID_DEAL');
     }
   }
 }

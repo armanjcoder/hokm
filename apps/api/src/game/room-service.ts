@@ -1,7 +1,7 @@
-import { createGame, type HokmGameState, type Seat } from '@hokm/game-engine';
+import { createGame, getModeConfig, type GameMode, type HokmGameState, type Seat } from '@hokm/game-engine';
 import { HttpError } from '../errors.js';
 import { localizeErrorCode } from '../messages.js';
-import { evaluateReadiness, hasNoHumans, pickNextHost, REQUIRED_PLAYERS } from '../room-lifecycle.js';
+import { evaluateReadiness, hasNoHumans, pickNextHost, seatsFor } from '../room-lifecycle.js';
 import { createPlayerToken, verifyPlayerSession } from '../session.js';
 import { persistRoom, randomCode, rooms, touchRoom, uniqueRoomId } from '../state.js';
 import type { Room, RoomPlayer } from '../types.js';
@@ -11,7 +11,7 @@ import { autoAdvanceBots } from './bots.js';
 
 const TARGET_SCORE = 7;
 
-export function createRoom(hostName: string, telegramId?: number): Room {
+export function createRoom(hostName: string, telegramId?: number, mode: GameMode = 'classic4'): Room {
   const host: RoomPlayer = {
     id: randomCode(12),
     token: createPlayerToken(),
@@ -25,6 +25,7 @@ export function createRoom(hostName: string, telegramId?: number): Room {
   const room: Room = {
     id: uniqueRoomId(),
     code: randomCode(5),
+    mode,
     status: 'lobby',
     createdAt: now,
     lastActivityAt: now,
@@ -56,12 +57,15 @@ export function joinRoom(room: Room, name: string, telegramId?: number): RoomPla
   if (room.status !== 'lobby') {
     throw new HttpError(400, 'ROOM_ALREADY_STARTED', localizeErrorCode('ROOM_ALREADY_STARTED'));
   }
-  if (room.players.length >= REQUIRED_PLAYERS) {
+  const seats = seatsFor(room);
+  if (room.players.length >= seats) {
     throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
   }
 
   const takenSeats = new Set(room.players.map((p) => p.seat));
-  const seat = ([0, 1, 2, 3] as Seat[]).find((candidate) => !takenSeats.has(candidate));
+  const seat = ([0, 1, 2, 3] as Seat[])
+    .slice(0, seats)
+    .find((candidate) => !takenSeats.has(candidate));
   if (seat === undefined) throw new HttpError(400, 'ROOM_FULL', localizeErrorCode('ROOM_FULL'));
 
   const player: RoomPlayer = {
@@ -111,7 +115,7 @@ export function maybeStartGame(room: Room): boolean {
   if (!evaluateReadiness(room).canStart) return false;
   room.game = createGame(
     room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })),
-    { id: room.id, targetScore: TARGET_SCORE },
+    { id: room.id, mode: room.mode, targetScore: TARGET_SCORE },
   );
   room.status = 'playing';
   autoAdvanceBots(room);

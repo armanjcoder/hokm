@@ -1,6 +1,6 @@
-import type { RoomPlayer, RoomView } from '../types.js';
+import { MODE_OPTIONS, type RoomPlayer, type RoomView } from '../types.js';
 
-export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy }: {
+export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveRoom, invite, busy, showRules }: {
   room: RoomView;
   me: RoomPlayer | undefined;
   isHost: boolean;
@@ -10,18 +10,28 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
   leaveRoom: () => void;
   invite: () => void;
   busy: boolean;
+  showRules: () => void;
 }) {
   const readiness = room.readiness;
-  const seatsFull = room.players.length === 4;
+  const modeLabel = MODE_OPTIONS.find((option) => option.id === (room.mode ?? 'classic4'))?.label ?? '۴ نفره';
+  const totalSeats = room.mode === 'duel2' ? 2 : room.mode === 'solo3' ? 3 : 4;
+  const seatsFull = room.players.length === totalSeats;
   const waiting = readiness?.waitingOn.length ?? 0;
 
   return (
     <section className="panel lobby-panel">
-      <h2>لابی میز</h2>
-      <p>یارها روبه‌روی هم هستند: صندلی‌های ۱ و ۳ در برابر ۲ و ۴.</p>
+      <h2>لابی میز — حکم {modeLabel}</h2>
+      <p>
+        {room.mode === 'classic4'
+          ? 'یارها روبه‌روی هم هستند: صندلی‌های ۱ و ۳ در برابر ۲ و ۴.'
+          : 'در این حالت هرکس برای خودش بازی می‌کند.'}
+      </p>
+      <button className="link-button" type="button" onClick={showRules}>
+        قوانین حکم {modeLabel} را نشانم بده
+      </button>
 
       <div className="seat-grid">
-        {[0, 1, 2, 3].map((seat) => {
+        {Array.from({ length: totalSeats }, (_, seat) => seat).map((seat) => {
           const player = room.players.find((p) => p.seat === seat);
           const offline = Boolean(player) && !player?.isBot && !player?.connected;
           const isMe = player?.id === me?.id;
@@ -54,7 +64,7 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
 
       <div className="ready-status">
         {!seatsFull
-          ? `برای شروع به ۴ بازیکن نیاز داریم. الان ${room.players.length} نفر سر میز هستند.`
+          ? `برای شروع به ${totalSeats} بازیکن نیاز داریم. الان ${room.players.length} نفر سر میز هستند.`
           : waiting > 0
             ? `منتظر آمادگی ${waiting} بازیکن هستیم.`
             : 'همه آماده‌اند! بازی در حال شروع است…'}

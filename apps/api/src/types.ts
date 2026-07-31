@@ -1,4 +1,4 @@
-import type { HokmGameState, Seat } from '@hokm/game-engine';
+import type { GameMode, HokmGameState, Seat } from '@hokm/game-engine';
 import type { RoomStatus } from './room-lifecycle.js';
 
 export interface RoomPlayer {
@@ -16,6 +16,8 @@ export interface RoomPlayer {
 export interface Room {
   id: string;
   code: string;
+  /** Which Hokm variant this table plays. */
+  mode: GameMode;
   status: RoomStatus;
   createdAt: string;
   lastActivityAt?: string;

@@ -15,6 +15,7 @@ function lobbyRoom(): Room {
   return {
     id: 'room1',
     code: 'ABCDE',
+    mode: 'classic4',
     status: 'lobby',
     createdAt: '2026-07-30T00:00:00.000Z',
     hostPlayerId: 'p0',

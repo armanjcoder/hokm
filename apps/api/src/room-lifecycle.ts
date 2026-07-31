@@ -4,6 +4,9 @@
  * Kept free of Express/Socket.IO so the rules can be unit tested directly.
  */
 
+import { getModeConfig } from '@hokm/game-engine';
+import type { GameMode } from '@hokm/game-engine';
+
 export type RoomStatus = 'lobby' | 'playing' | 'finished' | 'abandoned';
 
 export interface LifecyclePlayer {
@@ -16,6 +19,7 @@ export interface LifecyclePlayer {
 
 export interface LifecycleRoom {
   id: string;
+  mode?: GameMode;
   status: RoomStatus;
   createdAt: string;
   lastActivityAt?: string;
@@ -36,6 +40,12 @@ export const DEFAULT_CLEANUP_POLICY: CleanupPolicy = {
   finishedIdleMs: 24 * 60 * 60 * 1000,
 };
 
+/** Seats required by a room's chosen mode. */
+export function seatsFor(room: Pick<LifecycleRoom, 'mode'>): number {
+  return getModeConfig(room.mode).seats;
+}
+
+/** Kept for the default four player game. */
 export const REQUIRED_PLAYERS = 4;
 
 export type StartBlockReason = 'ROOM_NOT_FULL' | 'PLAYERS_NOT_READY' | 'ROOM_ALREADY_STARTED';
@@ -50,9 +60,9 @@ export interface Readiness {
 }
 
 /**
- * A table starts when all four seats are taken and every *human* player is
- * ready. Bots are always considered ready, which is what makes 1, 2 and 3
- * player games work without any special casing.
+ * A table starts when every seat for the chosen mode is taken and each *human*
+ * player is ready. Bots always count as ready, which is what lets a mode run
+ * with fewer humans than seats.
  */
 export function evaluateReadiness(room: LifecycleRoom): Readiness {
   const humans = room.players.filter((player) => !player.isBot);
@@ -64,7 +74,7 @@ export function evaluateReadiness(room: LifecycleRoom): Readiness {
   if (room.status === 'playing' || room.status === 'finished') {
     return { ...base, canStart: false, blockedBy: 'ROOM_ALREADY_STARTED' };
   }
-  if (room.players.length !== REQUIRED_PLAYERS) {
+  if (room.players.length !== seatsFor(room)) {
     return { ...base, canStart: false, blockedBy: 'ROOM_NOT_FULL' };
   }
   if (waitingOn.length > 0) {
@@ -76,7 +86,7 @@ export function evaluateReadiness(room: LifecycleRoom): Readiness {
 /** Lowest free seat index, or undefined when the table is full. */
 export function nextFreeSeat(room: LifecycleRoom): number | undefined {
   const taken = new Set(room.players.map((player) => player.seat));
-  for (let seat = 0; seat < REQUIRED_PLAYERS; seat += 1) {
+  for (let seat = 0; seat < seatsFor(room); seat += 1) {
     if (!taken.has(seat)) return seat;
   }
   return undefined;

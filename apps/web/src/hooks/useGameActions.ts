@@ -15,6 +15,12 @@ export interface GameActions {
   chooseSuit: (suit: Suit) => void;
   play: (card: Card) => void;
   nextHand: () => void;
+  /** Two player mode: burn the selected cards. */
+  discard: (cardIds: string[]) => void;
+  /** Two player mode: reveal the next stock card. */
+  draw: () => void;
+  /** Two player mode: keep or burn the revealed card. */
+  resolveDraw: (keep: boolean) => void;
   /** Blocks actions that would be silently dropped while the socket is down. */
   requireConnection: () => boolean;
 }
@@ -47,6 +53,18 @@ export function useGameActions({ socket, session, game, connection, setToast }: 
     nextHand() {
       if (!session || !requireConnection()) return;
       socket.emit('game:next_hand', socketPayload(session), ackToast);
+    },
+    discard(cardIds) {
+      if (!session || !requireConnection()) return;
+      socket.emit('game:discard', { ...socketPayload(session), cardIds }, ackToast);
+    },
+    draw() {
+      if (!session || !requireConnection()) return;
+      socket.emit('game:draw', socketPayload(session), ackToast);
+    },
+    resolveDraw(keep) {
+      if (!session || !requireConnection()) return;
+      socket.emit('game:resolve_draw', { ...socketPayload(session), keep }, ackToast);
     },
   };
 }

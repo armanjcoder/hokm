@@ -46,7 +46,11 @@ roomsRouter.post('/rooms', (req, res) => {
 
   const body = createRoomSchema.parse(req.body);
   const identity = authenticate(body.initData);
-  const room = createRoom(sanitizeDisplayName(identity.name ?? body.hostName), identity.telegramId);
+  const room = createRoom(
+    sanitizeDisplayName(identity.name ?? body.hostName),
+    identity.telegramId,
+    body.mode,
+  );
   persistRoom(room);
 
   const host = room.players[0];

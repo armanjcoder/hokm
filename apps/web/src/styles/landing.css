@@ -26,3 +26,18 @@ label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
 .resume-screen h1 { font-size: 21px; margin: 14px 0 8px; }
 .spinner { width: 42px; height: 42px; margin: 8px auto 0; border-radius: 50%; border: 3px solid rgba(255,255,255,.14); border-top-color: #00d4aa; animation: spin .9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+.mode-picker { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.mode-option { display: grid; gap: 2px; padding: 12px 8px; border-radius: 18px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.06); color: #f7f7fb; font-family: inherit; text-align: center; }
+.mode-option strong { font-size: 15px; }
+.mode-option small { color: #a8a8ba; font-size: 11px; line-height: 1.5; }
+.mode-option.is-active { border-color: rgba(0,212,170,.55); background: rgba(0,212,170,.14); }
+.link-button { display: block; width: 100%; margin-top: 12px; padding: 10px; border: 0; border-radius: 14px; background: transparent; color: #8fe8d5; font-family: inherit; font-size: 14px; text-decoration: underline; cursor: pointer; }
+
+.rules-backdrop { position: fixed; inset: 0; z-index: 60; display: flex; align-items: flex-end; justify-content: center; padding: 16px; background: rgba(6,8,16,.6); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+.rules-sheet { width: 100%; max-width: 460px; max-height: 84vh; overflow-y: auto; padding: 24px 20px; border-radius: 28px 28px 20px 20px; background: linear-gradient(160deg, rgba(24,24,40,.98), rgba(14,14,26,.98)); border: 1px solid rgba(255,255,255,.14); box-shadow: 0 -12px 50px rgba(0,0,0,.5); }
+.rules-sheet h2 { margin: 0 0 14px; font-size: 19px; line-height: 1.6; }
+.rules-steps { margin: 0 0 14px; padding-inline-start: 20px; display: grid; gap: 8px; }
+.rules-steps li { line-height: 1.9; font-size: 14px; color: #dcdce8; }
+.rules-notes { margin: 0 0 18px; padding-inline-start: 20px; display: grid; gap: 8px; list-style: '★ '; }
+.rules-notes li { line-height: 1.9; font-size: 13px; color: #8fe8d5; }

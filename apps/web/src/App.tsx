@@ -9,6 +9,7 @@ import {
   userMessage,
   type StoredSession,
 } from './lib.js';
+import type { GameMode } from '@hokm/game-engine';
 import type { ConnectionStatus, RoomView } from './types.js';
 import { createGameSocket } from './api/socket.js';
 import { defaultApiUrl } from './api/session-storage.js';
@@ -25,6 +26,7 @@ import { StartOverlay } from './components/StartOverlay.js';
 import { TopBar } from './components/TopBar.js';
 import { AbandonedNotice } from './components/AbandonedNotice.js';
 import { Toast } from './components/Toast.js';
+import { RulesGuide } from './components/RulesGuide.js';
 import { shareRoom } from './api/share.js';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL || defaultApiUrl();
@@ -44,6 +46,8 @@ export function App() {
   const [toast, setToast] = useState('');
   const [connection, setConnection] = useState<ConnectionStatus>('connecting');
   const [starting, setStarting] = useState(false);
+  const [mode, setMode] = useState<GameMode>('classic4');
+  const [rulesFor, setRulesFor] = useState<GameMode | null>(null);
   const autoJoinAttempted = useRef(false);
 
   const socket = useMemo<Socket>(() => createGameSocket(apiUrl), [apiUrl]);
@@ -102,7 +106,7 @@ export function App() {
   async function createRoom() {
     setLoading(true);
     try {
-      const nextRoom = await createRoomRequest(apiUrl, name, initData);
+      const nextRoom = await createRoomRequest(apiUrl, name, initData, mode);
       const player = nextRoom.players[0];
       activateSession({ roomId: nextRoom.id, playerId: player.id, apiUrl, token: nextRoom.token });
       setRoom(nextRoom);
@@ -156,7 +160,7 @@ export function App() {
     }
   }
 
-  const { chooseSuit, play, nextHand, requireConnection } = useGameActions({
+  const { chooseSuit, play, nextHand, discard, draw, resolveDraw, requireConnection } = useGameActions({
     socket,
     session,
     game,
@@ -200,6 +204,9 @@ export function App() {
         createRoom={createRoom}
         joinRoom={joinRoom}
         toast={toast}
+        mode={mode}
+        setMode={setMode}
+        showRules={() => setRulesFor(mode)}
         savedSession={savedSession}
         linkedRoomId={new URLSearchParams(location.search).get('room') ?? ''}
         resumeSession={resumeSession}
@@ -222,6 +229,7 @@ export function App() {
           leaveRoom={leaveRoom}
           busy={lobbyBusy}
           invite={() => shareRoom(room.id, apiUrl)}
+          showRules={() => setRulesFor(room.mode ?? 'classic4')}
         />
       )}
       {room.status === 'abandoned' && (
@@ -237,10 +245,14 @@ export function App() {
           chooseSuit={chooseSuit}
           play={play}
           nextHand={nextHand}
+          discard={discard}
+          draw={draw}
+          resolveDraw={resolveDraw}
         />
       )}
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
       {starting && <StartOverlay />}
+      {rulesFor && <RulesGuide mode={rulesFor} onClose={() => setRulesFor(null)} />}
     </main>
   );
 }

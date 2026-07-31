@@ -62,6 +62,8 @@ export function normalizeLoadedRoom(room: Room): Room {
       : firstHuman?.id;
   return {
     ...room,
+    // Rooms saved before multi-mode support default to the classic game.
+    mode: room.mode ?? 'classic4',
     players,
     lastActivityAt: room.lastActivityAt ?? room.createdAt,
     ...(hostPlayerId !== undefined ? { hostPlayerId } : {}),

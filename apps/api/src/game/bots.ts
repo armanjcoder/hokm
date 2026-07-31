@@ -1,7 +1,11 @@
 import {
   chooseTrump,
+  discardCards,
+  drawCard,
+  getModeConfig,
   getValidCards,
   playCard,
+  resolveDraw,
   type Card,
   type HokmGameState,
   type Seat,
@@ -15,7 +19,7 @@ import type { Room, RoomPlayer } from '../types.js';
 export const BOT_NAMES = ['ربات نیکا', 'ربات آرش', 'ربات سارا'];
 
 /** Safety net against an unexpected engine state looping forever. */
-const MAX_BOT_STEPS = 80;
+const MAX_BOT_STEPS = 200;
 
 export function createBot(room: Room, seat: Seat): RoomPlayer {
   const used = new Set(room.players.filter((p) => p.isBot).map((p) => p.name));
@@ -45,7 +49,13 @@ export function autoAdvanceBots(room: Room): void {
     }
     if (room.game.phase === 'hand_complete') return;
 
-    const bot = room.players.find((player) => player.isBot && player.seat === room.game?.currentTurnSeat);
+    // During discarding every seat acts, not just the one whose turn it is.
+    const bot =
+      room.game.phase === 'discarding'
+        ? room.players.find(
+            (player) => player.isBot && !(room.game?.discardedSeats ?? []).includes(player.seat),
+          )
+        : room.players.find((player) => player.isBot && player.seat === room.game?.currentTurnSeat);
     if (!bot) return;
 
     // A bot must never be able to crash a request handler and leave the table
@@ -53,6 +63,23 @@ export function autoAdvanceBots(room: Room): void {
     try {
       if (room.game.phase === 'waiting_for_trump') {
         room.game = chooseTrump(room.game, bot.id, chooseBotTrump(room.game, bot.seat));
+        continue;
+      }
+
+      // Two player mode: burn the weakest cards, then always keep the draw.
+      if (room.game.phase === 'discarding') {
+        const config = getModeConfig(room.game.mode);
+        const weakest = [...room.game.hands[bot.seat]]
+          .sort((a, b) => botRankValue(a) - botRankValue(b))
+          .slice(0, config.discardCount)
+          .map((card) => card.id);
+        room.game = discardCards(room.game, bot.id, weakest);
+        continue;
+      }
+
+      if (room.game.phase === 'drawing') {
+        if (!room.game.pendingDraw) room.game = drawCard(room.game, bot.id);
+        room.game = resolveDraw(room.game, bot.id, true);
         continue;
       }
 
