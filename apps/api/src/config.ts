@@ -22,6 +22,7 @@ const defaultPublicUrl = `http://localhost:${port}`;
 const webAppUrl = normalizeEnvUrl(process.env.WEB_APP_URL ?? defaultPublicUrl);
 const publicApiUrl = normalizeEnvUrl(process.env.PUBLIC_API_URL ?? webAppUrl);
 const botToken = process.env.TELEGRAM_BOT_TOKEN ?? '';
+const telegramProxyUrl = (process.env.TELEGRAM_PROXY_URL ?? '').trim();
 
 const minCleanupIntervalMs = Number(process.env.ROOM_CLEANUP_MIN_INTERVAL_MS ?? 60_000);
 
@@ -35,6 +36,13 @@ export const config = {
   corsOrigins: parseCorsOrigins(process.env.CORS_ORIGIN ?? webAppUrl).map(normalizeEnvUrl),
   dbPath: resolveFromApiRoot(process.env.DB_PATH ?? './data/hokm.sqlite'),
   botToken,
+  /**
+   * Optional outbound proxy used *only* for calls to the Telegram Bot API.
+   * Lets the bot reach Telegram from a censored network while the rest of the
+   * process (Cloudflare Tunnel, players) keeps using the direct connection.
+   * Supported schemes: http, https, socks4, socks5, socks5h.
+   */
+  telegramProxyUrl: parseProxyUrl(telegramProxyUrl),
   /**
    * Telegram identities are only trusted when we hold a bot token to verify
    * them with. Without one (pure local development) we fall back to guests.
@@ -86,4 +94,28 @@ function hoursToMs(value: string | undefined, fallbackHours: number): number {
 function positiveNumber(value: string | undefined, fallback: number): number {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+/** Supported proxy schemes for the Telegram-only outbound proxy. */
+const PROXY_SCHEMES = new Set(['http:', 'https:', 'socks:', 'socks4:', 'socks4a:', 'socks5:', 'socks5h:']);
+
+/**
+ * Validates `TELEGRAM_PROXY_URL`. An unusable value is ignored with a warning
+ * rather than crashing the API, because the game itself does not need a proxy.
+ */
+export function parseProxyUrl(value: string): string | undefined {
+  const normalized = normalizeEnvUrl(value);
+  if (!normalized) return undefined;
+  let parsed: URL;
+  try {
+    parsed = new URL(normalized);
+  } catch {
+    console.warn(`TELEGRAM_PROXY_URL is not a valid URL and was ignored: ${value}`);
+    return undefined;
+  }
+  if (!PROXY_SCHEMES.has(parsed.protocol)) {
+    console.warn(`TELEGRAM_PROXY_URL scheme "${parsed.protocol}" is not supported and was ignored.`);
+    return undefined;
+  }
+  return normalized;
 }

@@ -2,6 +2,7 @@ import { Bot, InlineKeyboard } from 'grammy';
 import { config } from '../config.js';
 import { createRoom } from '../game/room-service.js';
 import { sanitizeDisplayName } from '../sanitize.js';
+import { createTelegramProxyAgent, describeProxy } from './proxy.js';
 
 /** Telegram bot commands. Optional: the game API runs fine without it. */
 
@@ -21,7 +22,11 @@ export async function startTelegramBot(): Promise<void> {
     return;
   }
 
-  const bot = new Bot(config.botToken);
+  const agent = createTelegramProxyAgent(config.telegramProxyUrl);
+  console.log(`Telegram bot network: ${describeProxy(config.telegramProxyUrl)}.`);
+  const bot = new Bot(config.botToken, {
+    client: { baseFetchConfig: agent ? { agent } : {} },
+  });
   await bot.api.setMyCommands([
     { command: 'start', description: 'شروع و باز کردن مینی‌اپ حکم' },
     { command: 'newgame', description: 'ساخت میز جدید حکم' },
