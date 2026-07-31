@@ -39,5 +39,4 @@ label { display: block; margin: 22px 0 8px; color: #c9c9d6; font-size: 14px; }
 .rules-sheet h2 { margin: 0 0 14px; font-size: 19px; line-height: 1.6; }
 .rules-steps { margin: 0 0 14px; padding-inline-start: 20px; display: grid; gap: 8px; }
 .rules-steps li { line-height: 1.9; font-size: 14px; color: #dcdce8; }
-.rules-notes { margin: 0 0 18px; padding-inline-start: 20px; display: grid; gap: 8px; list-style: '★ '; }
-.rules-notes li { line-height: 1.9; font-size: 13px; color: #8fe8d5; }
+.rules-key { margin: 0 0 18px; padding: 12px 14px; border-radius: 16px; background: rgba(0,212,170,.12); border: 1px solid rgba(0,212,170,.28); color: #8fe8d5; font-size: 13px; line-height: 1.9; }

@@ -179,39 +179,51 @@ export function App() {
     onLeft: () => forgetSession('از میز خارج شدی.'),
   });
 
+  // The rules guide must be reachable from every screen, including the landing
+  // page before any room exists, so it is rendered alongside each branch.
+  const rulesOverlay = rulesFor ? (
+    <RulesGuide mode={rulesFor} onClose={() => setRulesFor(null)} />
+  ) : null;
+
   // Re-joining a saved table: show progress instead of a blank screen.
   if (sessionPhase === 'resuming' && !room) {
     return (
-      <ResumingScreen
-        roomId={session?.roomId ?? savedSession?.roomId ?? ''}
-        connection={connection}
-        cancel={() => sessionCtl.cancelResume()}
-        forget={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
-      />
+      <>
+        <ResumingScreen
+          roomId={session?.roomId ?? savedSession?.roomId ?? ''}
+          connection={connection}
+          cancel={() => sessionCtl.cancelResume()}
+          forget={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
+        />
+        {rulesOverlay}
+      </>
     );
   }
 
   if (!room || !session) {
     return (
-      <Landing
-        name={name}
-        setName={setName}
-        joinCode={joinCode}
-        setJoinCode={setJoinCode}
-        apiUrl={apiUrl}
-        setApiUrl={updateApiUrl}
-        loading={loading}
-        createRoom={createRoom}
-        joinRoom={joinRoom}
-        toast={toast}
-        mode={mode}
-        setMode={setMode}
-        showRules={() => setRulesFor(mode)}
-        savedSession={savedSession}
-        linkedRoomId={new URLSearchParams(location.search).get('room') ?? ''}
-        resumeSession={resumeSession}
-        clearSavedSession={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
-      />
+      <>
+        <Landing
+          name={name}
+          setName={setName}
+          joinCode={joinCode}
+          setJoinCode={setJoinCode}
+          apiUrl={apiUrl}
+          setApiUrl={updateApiUrl}
+          loading={loading}
+          createRoom={createRoom}
+          joinRoom={joinRoom}
+          toast={toast}
+          mode={mode}
+          setMode={setMode}
+          showRules={() => setRulesFor(mode)}
+          savedSession={savedSession}
+          linkedRoomId={new URLSearchParams(location.search).get('room') ?? ''}
+          resumeSession={resumeSession}
+          clearSavedSession={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
+        />
+        {rulesOverlay}
+      </>
     );
   }
 
@@ -252,7 +264,7 @@ export function App() {
       )}
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
       {starting && <StartOverlay />}
-      {rulesFor && <RulesGuide mode={rulesFor} onClose={() => setRulesFor(null)} />}
+      {rulesOverlay}
     </main>
   );
 }
