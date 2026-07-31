@@ -1,4 +1,6 @@
+import { Bot } from 'grammy';
 import { describe, expect, it, vi } from 'vitest';
+import { telegramClientOptions } from '../src/telegram/bot.js';
 import { createTelegramProxyAgent, describeProxy } from '../src/telegram/proxy.js';
 import { parseProxyUrl } from '../src/config.js';
 
@@ -71,5 +73,23 @@ describe('describeProxy', () => {
 
   it('degrades gracefully on a malformed url', () => {
     expect(describeProxy('nonsense')).toBe('invalid proxy');
+  });
+});
+
+describe('telegramClientOptions', () => {
+  it('passes no agent to grammY when no proxy is configured', () => {
+    expect(telegramClientOptions('')).toEqual({ baseFetchConfig: {} });
+  });
+
+  it('hands the socks agent to the grammY fetch config', () => {
+    const options = telegramClientOptions('socks5://127.0.0.1:10808');
+    expect(options.baseFetchConfig.agent?.constructor.name).toBe('SocksProxyAgent');
+  });
+
+  it('is accepted by a real grammY Bot instance', () => {
+    const bot = new Bot('123456:TEST-TOKEN-NOT-REAL', {
+      client: telegramClientOptions('socks5://127.0.0.1:10808'),
+    });
+    expect(bot.api).toBeDefined();
   });
 });

@@ -16,17 +16,24 @@ export function buildWebAppUrl(params: Record<string, string> = {}): string {
   return url.toString();
 }
 
+/**
+ * grammY client options for the configured network path. Exported so tests can
+ * assert that a configured proxy really reaches the Bot API client instead of
+ * being silently dropped.
+ */
+export function telegramClientOptions(proxyUrl = config.telegramProxyUrl) {
+  const agent = createTelegramProxyAgent(proxyUrl);
+  return { baseFetchConfig: agent ? { agent } : {} };
+}
+
 export async function startTelegramBot(): Promise<void> {
   if (!config.botToken) {
     console.log('TELEGRAM_BOT_TOKEN is empty; bot is disabled in local mode.');
     return;
   }
 
-  const agent = createTelegramProxyAgent(config.telegramProxyUrl);
   console.log(`Telegram bot network: ${describeProxy(config.telegramProxyUrl)}.`);
-  const bot = new Bot(config.botToken, {
-    client: { baseFetchConfig: agent ? { agent } : {} },
-  });
+  const bot = new Bot(config.botToken, { client: telegramClientOptions() });
   await bot.api.setMyCommands([
     { command: 'start', description: 'شروع و باز کردن مینی‌اپ حکم' },
     { command: 'newgame', description: 'ساخت میز جدید حکم' },
