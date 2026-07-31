@@ -434,7 +434,7 @@ function normalizeLoadedRoom(room: Room): Room {
 }
 
 function createRoom(hostName: string, telegramId?: number): Room {
-  const id = randomCode(10).toLowerCase();
+  const id = uniqueRoomId();
   const host: RoomPlayer = {
     id: randomCode(12),
     token: createPlayerToken(),
@@ -556,11 +556,13 @@ function leaveRoom(room: Room, playerId: string): void {
   const player = room.players.find((candidate) => candidate.id === playerId);
   if (!player) throw new HttpError(404, 'PLAYER_NOT_FOUND', localizeErrorCode('PLAYER_NOT_FOUND'));
 
-  if (room.status === 'lobby') {
-    room.players = room.players.filter((candidate) => candidate.id !== playerId);
-  } else {
+  // Only a game in progress needs its seats preserved: the engine state is
+  // indexed by seat, so removing a player mid-game corrupts hands and scores.
+  if (room.status === 'playing') {
     player.connected = false;
     player.ready = false;
+  } else {
+    room.players = room.players.filter((candidate) => candidate.id !== playerId);
   }
 
   if (room.hostPlayerId === playerId) {
@@ -714,6 +716,15 @@ function requireRoom(roomId: string): Room {
   const room = rooms.get(roomId);
   if (!room) throw new HttpError(404, 'ROOM_NOT_FOUND', localizeErrorCode('ROOM_NOT_FOUND'));
   return room;
+}
+
+/** Room ids address a table publicly, so a collision would hijack a live game. */
+function uniqueRoomId(): string {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = randomCode(10).toLowerCase();
+    if (!rooms.has(candidate)) return candidate;
+  }
+  return `${randomCode(10).toLowerCase()}${Date.now().toString(36)}`;
 }
 
 function randomCode(length: number) {

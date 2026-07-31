@@ -312,3 +312,47 @@ describe('readiness is re-evaluated on every lobby change', () => {
     expect(ready.body.started).toBe(true);
   });
 });
+
+describe('hardening details', () => {
+  it('issues unique room ids across many rooms', async () => {
+    const ids = await Promise.all(
+      Array.from({ length: 25 }, async () => (await newTable()).roomId),
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('frees the seat when leaving a finished table', async () => {
+    const host = await newTable();
+    const guest = await joinAs(host.roomId, 'نیکا');
+    for (let i = 0; i < 2; i += 1) await post(`/rooms/${host.roomId}/add-bot`, host);
+    await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+    await post(`/rooms/${host.roomId}/ready`, { ...guest, ready: true });
+
+    // Mid-game the seat is preserved.
+    const midGame = await post(`/rooms/${host.roomId}/leave`, guest);
+    expect(midGame.body.room.players).toHaveLength(4);
+  });
+
+  it('refuses gameplay on an abandoned table', async () => {
+    const host = await newTable();
+    await post(`/rooms/${host.roomId}/add-bot`, host);
+    await post(`/rooms/${host.roomId}/leave`, host);
+
+    const room = await getRoom(host.roomId);
+    expect(room.status).toBe('abandoned');
+
+    const readyAgain = await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+    expect(readyAgain.status).toBeGreaterThanOrEqual(400);
+  });
+
+  it('reports readiness counts that the lobby UI relies on', async () => {
+    const host = await newTable();
+    await joinAs(host.roomId, 'نیکا');
+    await post(`/rooms/${host.roomId}/add-bot`, host);
+
+    const room = await getRoom(host.roomId);
+    expect(room.readiness.humanCount).toBe(2);
+    expect(room.readiness.botCount).toBe(1);
+    expect(room.readiness.canStart).toBe(false);
+  });
+});
