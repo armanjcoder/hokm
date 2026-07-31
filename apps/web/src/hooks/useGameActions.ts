@@ -15,6 +15,8 @@ export interface GameActions {
   chooseSuit: (suit: Suit) => void;
   play: (card: Card) => void;
   nextHand: () => void;
+  /** "ده‌لو کم": ask for a fresh deal when the opening hand is weak. */
+  requestRedeal: () => void;
   /** Two player mode: burn the selected cards. */
   discard: (cardIds: string[]) => void;
   /** Two player mode: reveal the next stock card. */
@@ -53,6 +55,10 @@ export function useGameActions({ socket, session, game, connection, setToast }: 
     nextHand() {
       if (!session || !requireConnection()) return;
       socket.emit('game:next_hand', socketPayload(session), ackToast);
+    },
+    requestRedeal() {
+      if (!session || !requireConnection()) return;
+      socket.emit('game:redeal', socketPayload(session), ackToast);
     },
     discard(cardIds) {
       if (!session || !requireConnection()) return;

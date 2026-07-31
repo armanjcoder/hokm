@@ -35,6 +35,9 @@ export function sanitizeRoom(room: Room) {
           roundNumber: room.game.roundNumber,
           mode: room.game.mode,
           targetScore: room.game.targetScore,
+          canRequestRedeal: room.game.canRequestRedeal,
+          rules: room.game.rules,
+          redealCount: room.game.redealCount,
           stockCount: room.game.stock?.length ?? 0,
           lastEvent: room.game.lastEvent,
         }

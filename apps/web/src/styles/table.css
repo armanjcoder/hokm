@@ -45,3 +45,4 @@
 .score-badge.normal { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); color: #dcdce8; }
 .score-badge.kot { background: rgba(0,212,170,.14); border: 1px solid rgba(0,212,170,.4); color: #8fe8d5; }
 .score-badge.hakem-kot { background: rgba(255,200,87,.16); border: 1px solid rgba(255,200,87,.45); color: #ffd98a; }
+.redeal-card { border-color: rgba(255,200,87,.4); }

@@ -18,10 +18,15 @@ export const targetScoreSchema = z
     message: 'Unsupported target score.',
   });
 
+export const rulesSchema = z.object({
+  lowHandRedeal: z.boolean().optional(),
+});
+
 export const createRoomSchema = z.object({
   hostName: playerName.default('بازیکن'),
   mode: modeSchema.default('classic4'),
   targetScore: targetScoreSchema.default(DEFAULT_TARGET_SCORE),
+  rules: rulesSchema.optional(),
   initData,
 });
 
@@ -42,6 +47,7 @@ export const removeBotSchema = actorSchema.extend({ botId: z.string().min(1) });
 export const settingsSchema = actorSchema.extend({
   mode: modeSchema.optional(),
   targetScore: targetScoreSchema.optional(),
+  rules: rulesSchema.optional(),
 });
 export const readySchema = actorSchema.extend({ ready: z.boolean().default(true) });
 
@@ -57,6 +63,7 @@ export const socketJoinSchema = socketActor;
 export const chooseTrumpSchema = socketActor.extend({ suit: suitSchema });
 export const playCardSchema = socketActor.extend({ cardId: z.string().min(1) });
 export const nextHandSchema = socketActor;
+export const redealSchema = socketActor;
 export const discardSchema = socketActor.extend({
   cardIds: z.array(z.string().min(1)).min(1).max(5),
 });

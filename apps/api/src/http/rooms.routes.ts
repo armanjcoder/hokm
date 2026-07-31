@@ -1,11 +1,12 @@
 import { Router } from 'express';
-import { getModeConfig, type Seat } from '@hokm/game-engine';
+import { getModeConfig, type OptionalRules, type Seat } from '@hokm/game-engine';
 import { authenticate } from '../auth.js';
 import { config } from '../config.js';
 import { HttpError } from '../errors.js';
 import { createBot } from '../game/bots.js';
 import {
   createRoom,
+  DEFAULT_ROOM_RULES,
   joinRoom,
   leaveRoom,
   maybeStartGame,
@@ -30,6 +31,15 @@ import {
 import { persistRoom, requireRoom, rooms, touchRoom } from '../state.js';
 import { createRoomLimiter, enforceLimit, lobbyLimiter } from './middleware.js';
 
+/** Applies only the rule flags a client actually sent. */
+function mergeRules(base: OptionalRules, patch: { lowHandRedeal?: boolean | undefined } | undefined): OptionalRules {
+  if (!patch) return base;
+  return {
+    ...base,
+    ...(patch.lowHandRedeal !== undefined ? { lowHandRedeal: patch.lowHandRedeal } : {}),
+  };
+}
+
 export const roomsRouter: Router = Router();
 
 roomsRouter.get('/rooms/:roomId', (req, res) => {
@@ -52,6 +62,7 @@ roomsRouter.post('/rooms', (req, res) => {
     identity.telegramId,
     body.mode,
     body.targetScore,
+    mergeRules(DEFAULT_ROOM_RULES, body.rules),
   );
   persistRoom(room);
 
@@ -83,6 +94,7 @@ roomsRouter.post('/rooms/:roomId/settings', (req, res) => {
   requireLobby(room);
 
   if (body.targetScore !== undefined) room.targetScore = body.targetScore;
+  if (body.rules !== undefined) room.rules = mergeRules(room.rules, body.rules);
 
   if (body.mode !== undefined && body.mode !== room.mode) {
     room.mode = body.mode;

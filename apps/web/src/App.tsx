@@ -161,7 +161,7 @@ export function App() {
     }
   }
 
-  const { chooseSuit, play, nextHand, discard, draw, resolveDraw, requireConnection } = useGameActions({
+  const { chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw, requireConnection } = useGameActions({
     socket,
     session,
     game,
@@ -267,6 +267,7 @@ export function App() {
           chooseSuit={chooseSuit}
           play={play}
           nextHand={nextHand}
+          requestRedeal={requestRedeal}
           discard={discard}
           draw={draw}
           resolveDraw={resolveDraw}

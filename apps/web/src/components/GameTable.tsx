@@ -11,6 +11,7 @@ export interface GameTableProps {
   chooseSuit: (suit: Suit) => void;
   play: (card: Card) => void;
   nextHand: () => void;
+  requestRedeal: () => void;
   discard: (cardIds: string[]) => void;
   draw: () => void;
   resolveDraw: (keep: boolean) => void;
@@ -23,6 +24,7 @@ export function GameTable({
   chooseSuit,
   play,
   nextHand,
+  requestRedeal,
   discard,
   draw,
   resolveDraw,
@@ -93,6 +95,15 @@ export function GameTable({
               </button>
             ))}
           </div>
+        </div>
+      )}
+      {game.phase === 'waiting_for_trump' && isHakem && game.canRequestRedeal && (
+        <div className="glass wait-card phase-card redeal-card">
+          <h3>ده‌لو کم</h3>
+          <p>هیچ کارت عکس‌داری نداری. می‌توانی بخواهی کارت‌ها دوباره پخش شوند.</p>
+          <button className="ghost" type="button" onClick={requestRedeal}>
+            درخواست پخش دوباره
+          </button>
         </div>
       )}
       {game.phase === 'waiting_for_trump' && !isHakem && (

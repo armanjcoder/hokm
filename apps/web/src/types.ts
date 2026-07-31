@@ -32,6 +32,7 @@ export interface RoomView {
   code: string;
   mode?: GameMode;
   targetScore?: number;
+  rules?: { lowHandRedeal: boolean; maxRedeals: number };
   status: RoomStatus;
   hostPlayerId?: string;
   readiness?: Readiness;

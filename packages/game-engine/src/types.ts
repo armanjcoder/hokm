@@ -69,6 +69,12 @@ export interface HokmGameState {
   targetScore: number;
   roundNumber: number;
   lastEvent?: string;
+  /** Active house rules for this match. */
+  rules: OptionalRules;
+  /** Consecutive redeals already granted this hand. */
+  redealCount: number;
+  /** True when the hakem is currently allowed to demand a redeal. */
+  canRequestRedeal: boolean;
   /** Cards removed so the deck divides evenly (three player mode). */
   removedCards?: Card[];
   /** Two player only: face-down stock drawn from during the draw phase. */
@@ -82,11 +88,23 @@ export interface HokmGameState {
   pendingDraw?: { seat: Seat; card: Card } | undefined;
 }
 
+/** House rules a host can switch on before the match starts. */
+export interface OptionalRules {
+  /**
+   * "ده‌لو کم": the hakem may demand a redeal when their opening cards contain
+   * no face card (A, K, Q, J).
+   */
+  lowHandRedeal: boolean;
+  /** Maximum consecutive redeals, so a table cannot lock up. */
+  maxRedeals: number;
+}
+
 export interface CreateGameOptions {
   id?: string;
   mode?: GameMode;
   targetScore?: number;
   hakemSeat?: Seat;
+  rules?: Partial<OptionalRules>;
   rng?: () => number;
 }
 

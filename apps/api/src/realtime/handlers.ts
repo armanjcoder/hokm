@@ -1,5 +1,13 @@
 import type { Server, Socket } from 'socket.io';
-import { chooseTrump, continueToNextHand, discardCards, drawCard, playCard, resolveDraw } from '@hokm/game-engine';
+import {
+  chooseTrump,
+  continueToNextHand,
+  discardCards,
+  drawCard,
+  playCard,
+  requestRedeal,
+  resolveDraw,
+} from '@hokm/game-engine';
 import { normalizeError } from '../errors.js';
 import { autoAdvanceBots } from '../game/bots.js';
 import { requireActiveGame, requireSession } from '../game/room-service.js';
@@ -10,6 +18,7 @@ import {
   drawSchema,
   nextHandSchema,
   playCardSchema,
+  redealSchema,
   resolveDrawSchema,
   socketJoinSchema,
 } from '../schemas.js';
@@ -24,6 +33,7 @@ export function registerSocketHandlers(io: Server): void {
     socket.on('game:choose_trump', (payload: unknown, ack: Ack) => handleChooseTrump(payload, ack));
     socket.on('game:play_card', (payload: unknown, ack: Ack) => handlePlayCard(payload, ack));
     socket.on('game:next_hand', (payload: unknown, ack: Ack) => handleNextHand(payload, ack));
+    socket.on('game:redeal', (payload: unknown, ack: Ack) => handleRedeal(payload, ack));
     socket.on('game:discard', (payload: unknown, ack: Ack) => handleDiscard(payload, ack));
     socket.on('game:draw', (payload: unknown, ack: Ack) => handleDraw(payload, ack));
     socket.on('game:resolve_draw', (payload: unknown, ack: Ack) => handleResolveDraw(payload, ack));
@@ -101,6 +111,26 @@ function handleNextHand(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = continueToNextHand(game);
+    autoAdvanceBots(room);
+    touchRoom(room);
+    persistRoom(room);
+
+    ack?.({ ok: true });
+    void emitRoom(room);
+  } catch (error) {
+    ack?.(normalizeError(error));
+  }
+}
+
+/** "ده‌لو کم": hakem asks for a fresh deal when their opening hand is weak. */
+function handleRedeal(payload: unknown, ack: Ack): void {
+  try {
+    const { roomId, playerId, token } = redealSchema.parse(payload);
+    const room = requireRoom(roomId);
+    requireSession(room, playerId, token);
+    const game = requireActiveGame(room);
+
+    room.game = requestRedeal(game, playerId);
     autoAdvanceBots(room);
     touchRoom(room);
     persistRoom(room);

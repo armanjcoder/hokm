@@ -239,3 +239,80 @@ describe('target score and host settings', () => {
     expect(room.targetScore).toBe(3);
   });
 });
+
+describe('optional rule: low hand redeal', () => {
+  it('is off by default', async () => {
+    const host = await newTable('classic4');
+    expect(host.body.rules.lowHandRedeal).toBe(false);
+  });
+
+  it('can be enabled at creation time', async () => {
+    const created = await post('/rooms', {
+      hostName: 'آرمان',
+      rules: { lowHandRedeal: true },
+    });
+    expect(created.body.rules.lowHandRedeal).toBe(true);
+  });
+
+  it('can be toggled by the host from the lobby', async () => {
+    const host = await newTable('classic4');
+    const on = await post(`/rooms/${host.roomId}/settings`, {
+      ...host,
+      rules: { lowHandRedeal: true },
+    });
+    expect(on.body.rules.lowHandRedeal).toBe(true);
+
+    const off = await post(`/rooms/${host.roomId}/settings`, {
+      ...host,
+      rules: { lowHandRedeal: false },
+    });
+    expect(off.body.rules.lowHandRedeal).toBe(false);
+  });
+
+  it('keeps the other settings when only the rules change', async () => {
+    const host = await newTable('solo3');
+    await post(`/rooms/${host.roomId}/settings`, { ...host, targetScore: 5 });
+    const updated = await post(`/rooms/${host.roomId}/settings`, {
+      ...host,
+      rules: { lowHandRedeal: true },
+    });
+    expect(updated.body.mode).toBe('solo3');
+    expect(updated.body.targetScore).toBe(5);
+    expect(updated.body.rules.lowHandRedeal).toBe(true);
+  });
+
+  it('refuses a rule change from a non-host', async () => {
+    const host = await newTable('classic4');
+    const guestRes = await post(`/rooms/${host.roomId}/join`, { name: 'نیکا' });
+    const guest = {
+      roomId: host.roomId,
+      playerId: guestRes.body.player.id as string,
+      token: guestRes.body.token as string,
+    };
+    const attempt = await post(`/rooms/${host.roomId}/settings`, {
+      ...guest,
+      rules: { lowHandRedeal: true },
+    });
+    expect(attempt.status).toBe(403);
+  });
+
+  it('carries the rule into the started game', async () => {
+    const created = await post('/rooms', {
+      hostName: 'آرمان',
+      mode: 'duel2',
+      rules: { lowHandRedeal: true },
+    });
+    const host = {
+      roomId: created.body.id as string,
+      playerId: created.body.players[0].id as string,
+      token: created.body.token as string,
+    };
+    await post(`/rooms/${host.roomId}/add-bot`, host);
+    await post(`/rooms/${host.roomId}/ready`, { ...host, ready: true });
+
+    const room = await (await fetch(`${server.url}/rooms/${host.roomId}`)).json();
+    expect(room.game.rules.lowHandRedeal).toBe(true);
+    // The flag is computed by the server from the real hand.
+    expect(typeof room.game.canRequestRedeal).toBe('boolean');
+  });
+});

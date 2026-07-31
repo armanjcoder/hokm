@@ -1,4 +1,11 @@
-import { createGame, DEFAULT_TARGET_SCORE, type GameMode, type HokmGameState, type Seat } from '@hokm/game-engine';
+import {
+  createGame,
+  DEFAULT_TARGET_SCORE,
+  type GameMode,
+  type HokmGameState,
+  type OptionalRules,
+  type Seat,
+} from '@hokm/game-engine';
 import { HttpError } from '../errors.js';
 import { localizeErrorCode } from '../messages.js';
 import { evaluateReadiness, hasNoHumans, pickNextHost, seatsFor } from '../room-lifecycle.js';
@@ -9,11 +16,15 @@ import { autoAdvanceBots } from './bots.js';
 
 /** Table lifecycle: creating, joining, readiness, leaving and authorisation. */
 
+/** Optional rules stay off unless the host turns them on. */
+export const DEFAULT_ROOM_RULES: OptionalRules = { lowHandRedeal: false, maxRedeals: 2 };
+
 export function createRoom(
   hostName: string,
   telegramId?: number,
   mode: GameMode = 'classic4',
   targetScore: number = DEFAULT_TARGET_SCORE,
+  rules: OptionalRules = DEFAULT_ROOM_RULES,
 ): Room {
   const host: RoomPlayer = {
     id: randomCode(12),
@@ -30,6 +41,7 @@ export function createRoom(
     code: randomCode(5),
     mode,
     targetScore,
+    rules,
     status: 'lobby',
     createdAt: now,
     lastActivityAt: now,
@@ -119,7 +131,7 @@ export function maybeStartGame(room: Room): boolean {
   if (!evaluateReadiness(room).canStart) return false;
   room.game = createGame(
     room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })),
-    { id: room.id, mode: room.mode, targetScore: room.targetScore },
+    { id: room.id, mode: room.mode, targetScore: room.targetScore, rules: room.rules },
   );
   room.status = 'playing';
   autoAdvanceBots(room);

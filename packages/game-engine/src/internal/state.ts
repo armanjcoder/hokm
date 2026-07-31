@@ -1,6 +1,6 @@
-import { cardRankValue, createDeck, HokmError, shuffle, SUITS } from '../cards.js';
+import { cardRankValue, createDeck, HokmError, isLowHand, shuffle, SUITS } from '../cards.js';
 import { getModeConfig, suitsToTrim, teamOfSeat, teamsOf, TRIMMED_RANK, type ModeConfig } from '../modes.js';
-import type { Card, GameMode, HandScore, HokmGameState, Player, Seat, Suit, TeamId } from '../types.js';
+import type { Card, GameMode, HandScore, HokmGameState, OptionalRules, Player, Seat, Suit, TeamId } from '../types.js';
 
 const suits = SUITS;
 
@@ -8,6 +8,11 @@ const suits = SUITS;
 export function emptyTrickScore(config: ModeConfig): Record<TeamId, number> {
   return Object.fromEntries(teamsOf(config).map((team) => [team, 0])) as Record<TeamId, number>;
 }
+
+export const DEFAULT_RULES: OptionalRules = {
+  lowHandRedeal: false,
+  maxRedeals: 2,
+};
 
 export function startNewHand(input: {
   id: string;
@@ -17,6 +22,9 @@ export function startNewHand(input: {
   matchScore: Record<TeamId, number>;
   targetScore: number;
   roundNumber: number;
+  rules: OptionalRules;
+  /** Carried across a redeal so the limit is not reset by dealing again. */
+  redealCount?: number;
   rng: (() => number) | undefined;
 }): HokmGameState {
   const config = getModeConfig(input.mode);
@@ -31,10 +39,19 @@ export function startNewHand(input: {
     deckIndex += config.initialDeal;
   }
 
+  const redealCount = input.redealCount ?? 0;
+  const canRequestRedeal =
+    input.rules.lowHandRedeal &&
+    redealCount < input.rules.maxRedeals &&
+    isLowHand(hands[input.hakemSeat]);
+
   return {
     id: input.id,
     mode: input.mode,
     players: input.players,
+    rules: input.rules,
+    redealCount,
+    canRequestRedeal,
     phase: 'waiting_for_trump',
     hakemSeat: input.hakemSeat,
     currentTurnSeat: input.hakemSeat,

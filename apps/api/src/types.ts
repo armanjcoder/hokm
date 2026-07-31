@@ -1,4 +1,4 @@
-import type { GameMode, HokmGameState, Seat } from '@hokm/game-engine';
+import type { GameMode, HokmGameState, OptionalRules, Seat } from '@hokm/game-engine';
 import type { RoomStatus } from './room-lifecycle.js';
 
 export interface RoomPlayer {
@@ -20,6 +20,8 @@ export interface Room {
   mode: GameMode;
   /** Points needed to win the match. */
   targetScore: number;
+  /** House rules chosen by the host. */
+  rules: OptionalRules;
   status: RoomStatus;
   createdAt: string;
   lastActivityAt?: string;

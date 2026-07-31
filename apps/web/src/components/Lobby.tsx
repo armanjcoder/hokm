@@ -12,7 +12,11 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
   invite: () => void;
   busy: boolean;
   showRules: () => void;
-  updateSettings: (patch: { mode?: string; targetScore?: number }) => void;
+  updateSettings: (patch: {
+    mode?: string;
+    targetScore?: number;
+    rules?: { lowHandRedeal?: boolean };
+  }) => void;
 }) {
   const readiness = room.readiness;
   const modeLabel = MODE_OPTIONS.find((option) => option.id === (room.mode ?? 'classic4'))?.label ?? '۴ نفره';
@@ -70,6 +74,19 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, removeBot, leaveR
               </button>
             ))}
           </div>
+          <label className="rule-toggle">
+            <input
+              type="checkbox"
+              disabled={busy}
+              checked={Boolean(room.rules?.lowHandRedeal)}
+              onChange={(event) => updateSettings({ rules: { lowHandRedeal: event.target.checked } })}
+            />
+            <span>
+              <strong>ده‌لو کم</strong>
+              <small>اگر ۵ کارت اول حاکم هیچ کارت عکس‌داری نداشت، می‌تواند بخواهد دوباره پخش شود.</small>
+            </span>
+          </label>
+
           <small className="settings-hint">با تغییر حالت بازی، آمادگی همه دوباره صفر می‌شود.</small>
         </section>
       )}

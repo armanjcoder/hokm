@@ -1,5 +1,5 @@
-import { cleanup, render, screen } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GameTable } from '../src/components/GameTable.js';
 import type { RoomView } from '../src/types.js';
 
@@ -54,6 +54,7 @@ function renderTable(g: any) {
       chooseSuit={noop}
       play={noop}
       nextHand={noop}
+      requestRedeal={noop}
       discard={noop}
       draw={noop}
       resolveDraw={noop}
@@ -94,5 +95,58 @@ describe('target score is visible during play', () => {
   it('tells the player how long the match is', () => {
     renderTable(game({ phase: 'playing', targetScore: 5 }));
     expect(screen.getByText('تا 5 امتیاز')).toBeDefined();
+  });
+});
+
+describe('low hand redeal (ده‌لو کم)', () => {
+  const waiting = (extra: any = {}) =>
+    game({ phase: 'waiting_for_trump', handScore: { tricks: { 0: 0, 1: 0 } }, ...extra });
+
+  it('offers the redeal to the hakem when the hand qualifies', () => {
+    renderTable(waiting({ canRequestRedeal: true }));
+    expect(screen.getByText('درخواست پخش دوباره')).toBeDefined();
+  });
+
+  it('hides it when the rule is off or the hand is strong', () => {
+    renderTable(waiting({ canRequestRedeal: false }));
+    expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
+  });
+
+  it('calls the handler when pressed', () => {
+    const requestRedeal = vi.fn();
+    render(
+      <GameTable
+        room={baseRoom()}
+        game={waiting({ canRequestRedeal: true })}
+        meId="p0"
+        chooseSuit={noop}
+        play={noop}
+        nextHand={noop}
+        requestRedeal={requestRedeal}
+        discard={noop}
+        draw={noop}
+        resolveDraw={noop}
+      />,
+    );
+    fireEvent.click(screen.getByText('درخواست پخش دوباره'));
+    expect(requestRedeal).toHaveBeenCalledTimes(1);
+  });
+
+  it('never offers it to a non-hakem player', () => {
+    render(
+      <GameTable
+        room={baseRoom()}
+        game={waiting({ canRequestRedeal: true, hakemSeat: 1 })}
+        meId="p0"
+        chooseSuit={noop}
+        play={noop}
+        nextHand={noop}
+        requestRedeal={noop}
+        discard={noop}
+        draw={noop}
+        resolveDraw={noop}
+      />,
+    );
+    expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
   });
 });

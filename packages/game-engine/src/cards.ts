@@ -37,6 +37,18 @@ export function nextSeat(seat: Seat): Seat {
   return ((seat + 1) % 4) as Seat;
 }
 
+/** Face cards for the "ده‌لو کم" rule: anything above a 10. */
+const FACE_RANKS = new Set<Rank>(['A', 'K', 'Q', 'J']);
+
+export function isFaceCard(card: Card): boolean {
+  return FACE_RANKS.has(card.rank);
+}
+
+/** True when a hand has no A, K, Q or J, which allows a redeal request. */
+export function isLowHand(cards: Card[]): boolean {
+  return cards.length > 0 && !cards.some(isFaceCard);
+}
+
 export function cardRankValue(card: Card): number {
   return rankValue.get(card.rank) ?? 0;
 }

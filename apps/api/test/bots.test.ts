@@ -17,6 +17,7 @@ function soloRoom(): Room {
     code: 'ABCDE',
     mode: 'classic4',
     targetScore: 7,
+    rules: { lowHandRedeal: false, maxRedeals: 2 },
     status: 'lobby',
     createdAt: '2026-07-30T00:00:00.000Z',
     hostPlayerId: 'human',

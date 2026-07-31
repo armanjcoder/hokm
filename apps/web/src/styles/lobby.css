@@ -18,3 +18,8 @@
 .table-settings h3 { margin: 0 0 2px; font-size: 15px; }
 .settings-label { color: #a8a8ba; font-size: 13px; }
 .settings-hint { color: #9a9aad; font-size: 12px; line-height: 1.7; }
+.rule-toggle { display: flex; align-items: flex-start; gap: 10px; margin-top: 4px; cursor: pointer; }
+.rule-toggle input { width: 18px; height: 18px; margin-top: 2px; accent-color: #00d4aa; flex: 0 0 auto; }
+.rule-toggle span { display: grid; gap: 2px; }
+.rule-toggle strong { font-size: 14px; }
+.rule-toggle small { color: #9a9aad; font-size: 12px; line-height: 1.7; }
