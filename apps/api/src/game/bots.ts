@@ -13,12 +13,11 @@ import { randomCode } from '../state.js';
 import type { Room, RoomPlayer } from '../types.js';
 import {
   chooseCard,
-  chooseDiscards,
   chooseTrumpSuit,
   DEFAULT_BOT_DIFFICULTY,
-  shouldKeepDraw,
   type BotDifficulty,
 } from './bot-ai.js';
+import { chooseDiscards, shouldKeepDraw } from './bot-duel.js';
 
 /** Test bots so a single player can try a full table. */
 

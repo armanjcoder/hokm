@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { getModeConfig, type Card, type PublicGameView, type Suit } from '@hokm/game-engine';
 import { SUIT_META, suitSymbol, type RoomView } from '../types.js';
 import { PlayingCard } from './PlayingCard.js';
+import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
 
 export interface GameTableProps {
@@ -110,53 +111,16 @@ export function GameTable({
         <div className="glass wait-card">منتظر انتخاب حکم توسط حاکم...</div>
       )}
 
-      {game.phase === 'discarding' && (
-        <div className="glass wait-card phase-card">
-          {discarding ? (
-            <>
-              <h3>{config.discardCount} کارت بسوزان</h3>
-              <p>ضعیف‌ترین کارت‌هایت را انتخاب کن. حریف آن‌ها را نمی‌بیند.</p>
-              <button
-                className="primary"
-                type="button"
-                disabled={selected.length !== config.discardCount}
-                onClick={confirmDiscard}
-              >
-                سوزاندن {selected.length}/{config.discardCount}
-              </button>
-            </>
-          ) : (
-            <p>منتظر حریف تا کارت‌هایش را بسوزاند…</p>
-          )}
-        </div>
-      )}
-
-      {game.phase === 'drawing' && (
-        <div className="glass wait-card phase-card">
-          <h3>برداشتن از دسته</h3>
-          <p>{game.stockCount ?? 0} کارت در دسته مانده است.</p>
-          {pendingDraw ? (
-            <div className="draw-decision">
-              <PlayingCard card={pendingDraw.card} compact />
-              <div className="draw-actions">
-                <button className="primary" type="button" onClick={() => resolveDraw(true)}>
-                  نگه می‌دارم
-                </button>
-                <button className="ghost" type="button" onClick={() => resolveDraw(false)}>
-                  می‌سوزانم
-                </button>
-              </div>
-              <small>اگر نگه داری، کارت بعدی نادیده سوزانده می‌شود. اگر بسوزانی، کارت بعدی را ندیده باید برداری.</small>
-            </div>
-          ) : isMyTurn ? (
-            <button className="primary" type="button" onClick={draw}>
-              برداشتن کارت
-            </button>
-          ) : (
-            <p>نوبت حریف است…</p>
-          )}
-        </div>
-      )}
+      <DuelPhasePanels
+        game={game}
+        discarding={discarding}
+        discardCount={config.discardCount}
+        selected={selected}
+        isMyTurn={isMyTurn}
+        confirmDiscard={confirmDiscard}
+        draw={draw}
+        resolveDraw={resolveDraw}
+      />
 
       <div className="table-center">
         <div className="turn-badge" role="status" aria-live="polite">

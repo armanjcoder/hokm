@@ -8,6 +8,12 @@ import {
   type Seat,
   type Suit,
 } from '@hokm/game-engine';
+import {
+  isHighestRemaining,
+  knownVoids,
+  opponentSeats,
+  opponentsHoldNoTrumps,
+} from './bot-memory.js';
 
 /**
  * Bot decision making, separated from the turn loop so it can be unit tested
@@ -172,80 +178,12 @@ function beatsCurrentTrick(game: HokmGameState, card: Card, seat: Seat, trump: S
   return evaluateTrickWinner(trick, trump) === seat;
 }
 
-/** Every card that has been played, is on the table, or was removed pre-deal. */
-function playedCardIds(game: HokmGameState): Set<string> {
-  const seen = new Set<string>();
-  for (const trick of game.completedTricks) {
-    for (const play of trick.plays) seen.add(play.card.id);
-  }
-  for (const play of game.currentTrick.plays) seen.add(play.card.id);
-  for (const removed of game.removedCards ?? []) seen.add(removed.id);
-  return seen;
-}
-
-/**
- * True when no higher card of the same suit can still be held by anyone else.
- * Hard bots use this to know an ace or king is safe to lead.
- */
-function isHighestRemaining(game: HokmGameState, card: Card, seat: Seat): boolean {
-  const seen = playedCardIds(game);
-  for (const own of game.hands[seat]) seen.add(own.id);
-  return !allCardsOfSuit(card.suit).some(
-    (other) => !seen.has(other.id) && cardRankValue(other) > cardRankValue(card),
-  );
-}
-
-/**
- * True when every trump except our own has already been played.
- * Counting cards this way is exactly what a strong human player does.
- */
-function opponentsHoldNoTrumps(game: HokmGameState, seat: Seat, trump: Suit): boolean {
-  const seen = playedCardIds(game);
-  for (const own of game.hands[seat]) seen.add(own.id);
-  return allCardsOfSuit(trump).every((card) => seen.has(card.id));
-}
-
-/**
- * Suits each seat has shown they cannot follow.
- * Failing to follow the led suit proves a player is out of it.
- */
-function knownVoids(game: HokmGameState): Map<Seat, Set<Suit>> {
-  const voids = new Map<Seat, Set<Suit>>();
-  for (const trick of [...game.completedTricks, game.currentTrick]) {
-    const leadSuit = trick.plays[0]?.card.suit;
-    if (!leadSuit) continue;
-    for (const play of trick.plays) {
-      if (play.card.suit === leadSuit) continue;
-      const current = voids.get(play.seat) ?? new Set<Suit>();
-      current.add(leadSuit);
-      voids.set(play.seat, current);
-    }
-  }
-  return voids;
-}
-
-function opponentSeats(game: HokmGameState, seat: Seat): Seat[] {
-  const config = getModeConfig(game.mode);
-  return game.players
-    .filter(
-      (player) =>
-        !config.teamPlay || teamOfSeat(player.seat, config) !== teamOfSeat(seat, config),
-    )
-    .map((player) => player.seat);
-}
-
 function groupBySuit(cards: Card[]): Map<Suit, Card[]> {
   const bySuit = new Map<Suit, Card[]>();
   for (const card of cards) {
     bySuit.set(card.suit, [...(bySuit.get(card.suit) ?? []), card]);
   }
   return bySuit;
-}
-
-const RANKS: Card['rank'][] = ['A', 'K', 'Q', 'J', '10', '9', '8', '7', '6', '5', '4', '3', '2'];
-
-function allCardsOfSuit(suit: Suit): Card[] {
-  return RANKS.map((rank) => ({ id: `${suit}-${rank}`, suit, rank }));
 }
 
 function highest(cards: Card[]): Card {
@@ -278,37 +216,4 @@ export function chooseTrumpSuit(
   });
 
   return scores.sort((a, b) => b.score - a.score)[0]!.suit;
-}
-
-/** Two player mode: which cards to burn before the draw phase. */
-export function chooseDiscards(
-  game: HokmGameState,
-  seat: Seat,
-  count: number,
-  difficulty: BotDifficulty,
-): string[] {
-  const hand = [...game.hands[seat]];
-  // Every level keeps trumps and high cards now; easy simply values them less.
-  const trumpBonus = difficulty === 'easy' ? 20 : 100;
-  return hand
-    .sort((a, b) => discardValue(a, game.trumpSuit, trumpBonus) - discardValue(b, game.trumpSuit, trumpBonus))
-    .slice(0, count)
-    .map((card) => card.id);
-}
-
-function discardValue(card: Card, trump: Suit | undefined, trumpBonus: number): number {
-  return cardRankValue(card) + (card.suit === trump ? trumpBonus : 0);
-}
-
-/** Two player mode: whether to keep a revealed stock card. */
-export function shouldKeepDraw(
-  card: Card,
-  trump: Suit | undefined,
-  difficulty: BotDifficulty,
-): boolean {
-  // Trumps are always worth keeping.
-  if (card.suit === trump) return true;
-  // Otherwise only genuinely strong cards; easy bots are less selective.
-  const threshold = difficulty === 'hard' ? 11 : difficulty === 'medium' ? 10 : 9;
-  return cardRankValue(card) >= threshold;
 }

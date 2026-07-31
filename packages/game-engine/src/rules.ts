@@ -1,5 +1,6 @@
 import { createDeck, HokmError, shuffle, SUITS, localizeSuit } from './cards.js';
 import { evaluateTrickWinner } from './trick.js';
+import { getValidCards } from './legal-moves.js';
 import {
   getModeConfig,
   isGameMode,
@@ -144,20 +145,6 @@ export function chooseTrump(
   };
 }
 
-export function getValidCards(state: HokmGameState, playerId: string): Card[] {
-  const player = getPlayer(state, playerId);
-  const hand = state.hands[player.seat];
-  if (state.phase !== 'playing' || player.seat !== state.currentTurnSeat) {
-    return [];
-  }
-  const leadSuit = state.currentTrick.plays[0]?.card.suit;
-  if (!leadSuit) {
-    return hand;
-  }
-  const sameSuitCards = hand.filter((card) => card.suit === leadSuit);
-  return sameSuitCards.length > 0 ? sameSuitCards : hand;
-}
-
 export function playCard(state: HokmGameState, playerId: string, cardId: string): HokmGameState {
   if (state.phase !== 'playing') {
     throw new HokmError('Cards can only be played while the hand is active.', 'INVALID_PHASE');
@@ -261,48 +248,4 @@ function canStillSweep(
     .filter((team) => team !== leader)
     .reduce((sum, team) => sum + (tricks[team] ?? 0), 0);
   return takenByOthers === 0;
-}
-
-export function continueToNextHand(state: HokmGameState, rng: () => number = Math.random): HokmGameState {
-  if (state.phase !== 'hand_complete') {
-    throw new HokmError('Next hand can only start after a completed hand.', 'INVALID_PHASE');
-  }
-  const winner = state.handScore.winningTeam;
-  if (winner === undefined) {
-    throw new HokmError('Cannot continue before hand winner is known.', 'NO_HAND_WINNER');
-  }
-  const config = getModeConfig(state.mode);
-  const hakemTeam = teamOfSeat(state.hakemSeat, config);
-  const nextHakem = winner === hakemTeam ? state.hakemSeat : nextSeatFor(state.hakemSeat, config);
-
-  return startNewHand({
-    id: state.id,
-    mode: state.mode,
-    players: state.players,
-    hakemSeat: nextHakem,
-    matchScore: state.matchScore,
-    targetScore: state.targetScore,
-    roundNumber: state.roundNumber + 1,
-    rules: state.rules,
-    // A new hand starts the redeal allowance fresh.
-    rng,
-  });
-
-}
-
-export function toPublicView(state: HokmGameState, playerId: string): PublicGameView {
-  const player = getPlayer(state, playerId);
-  // `hands` and `stock` must never be spread into the view: they hold cards no
-  // client may see. Destructure them out explicitly so adding a field to the
-  // state can never leak it by accident.
-  const { hands, players, stock, ...rest } = state;
-  return {
-    ...rest,
-    players: players.map((p) => ({ ...p, cardCount: hands[p.seat].length })),
-    myHand: hands[player.seat],
-    validCardIds: getValidCards(state, playerId).map((card) => card.id),
-    stockCount: stock?.length ?? 0,
-    // Only the drawing player may see the revealed card.
-    pendingDraw: state.pendingDraw?.seat === player.seat ? state.pendingDraw : undefined,
-  };
 }

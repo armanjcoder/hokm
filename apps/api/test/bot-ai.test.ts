@@ -2,13 +2,12 @@ import { describe, expect, it } from 'vitest';
 import type { Card, HokmGameState, Seat, Suit } from '@hokm/game-engine';
 import {
   chooseCard,
-  chooseDiscards,
   chooseTrumpSuit,
   DIFFICULTY_LABELS,
   isBotDifficulty,
-  shouldKeepDraw,
   type BotDifficulty,
 } from '../src/game/bot-ai.js';
+import { chooseDiscards, shouldKeepDraw } from '../src/game/bot-duel.js';
 
 const card = (rank: Card['rank'], suit: Suit = 'hearts'): Card => ({
   id: `${suit}-${rank}`,

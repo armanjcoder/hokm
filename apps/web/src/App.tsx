@@ -18,15 +18,9 @@ import { useGameActions } from './hooks/useGameActions.js';
 import { useSession } from './hooks/useSession.js';
 import { useLobbyActions } from './hooks/useLobbyActions.js';
 import { createRoomRequest, joinRoomRequest } from './api/client.js';
-import { GameTable } from './components/GameTable.js';
-import { Landing } from './components/Landing.js';
-import { Lobby } from './components/Lobby.js';
-import { ResumingScreen } from './components/ResumingScreen.js';
-import { StartOverlay } from './components/StartOverlay.js';
-import { TopBar } from './components/TopBar.js';
-import { AbandonedNotice } from './components/AbandonedNotice.js';
-import { Toast } from './components/Toast.js';
 import { RulesGuide } from './components/RulesGuide.js';
+import { TableScreen } from './components/TableScreen.js';
+import { renderEntryScreen } from './components/EntryScreen.js';
 import { shareRoom } from './api/share.js';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL || defaultApiUrl();
@@ -199,98 +193,45 @@ export function App() {
     />
   ) : null;
 
-  // Re-joining a saved table: show progress instead of a blank screen.
-  if (sessionPhase === 'resuming' && !room) {
-    return (
-      <>
-        <ResumingScreen
-          roomId={session?.roomId ?? savedSession?.roomId ?? ''}
-          connection={connection}
-          cancel={() => sessionCtl.cancelResume()}
-          forget={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
-        />
-        {rulesOverlay}
-      </>
-    );
-  }
-
-  if (!room || !session) {
-    return (
-      <>
-        <Landing
-          name={name}
-          setName={setName}
-          joinCode={joinCode}
-          setJoinCode={setJoinCode}
-          apiUrl={apiUrl}
-          setApiUrl={updateApiUrl}
-          loading={loading}
-          createRoom={createRoom}
-          joinRoom={joinRoom}
-          toast={toast}
-          mode={mode}
-          setMode={setMode}
-          showRules={() => setRulesFor(mode)}
-          targetScore={targetScore}
-          setTargetScore={setTargetScore}
-          savedSession={savedSession}
-          linkedRoomId={new URLSearchParams(location.search).get('room') ?? ''}
-          resumeSession={resumeSession}
-          clearSavedSession={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
-        />
-        {rulesOverlay}
-      </>
-    );
-  }
+  const entry = renderEntryScreen({
+    sessionPhase,
+    room,
+    session,
+    savedSession,
+    connection,
+    rulesOverlay,
+    cancelResume: () => sessionCtl.cancelResume(),
+    forgetSession,
+    landing: {
+      name, setName, joinCode, setJoinCode, apiUrl,
+      setApiUrl: updateApiUrl, loading, createRoom, joinRoom, toast,
+      mode, setMode, showRules: () => setRulesFor(mode),
+      targetScore, setTargetScore, resumeSession,
+    },
+  });
+  if (entry) return entry;
+  // `renderEntryScreen` only returns null once both are present, but TypeScript
+  // cannot see through the call, so narrow explicitly.
+  if (!room || !session) return null;
 
   return (
-    <main className="app-shell">
-      <TopBar
-        room={room}
-        me={me}
-        apiUrl={apiUrl}
-        connection={connection}
-        showRules={() => setRulesFor(room.mode ?? 'classic4')}
-      />
-      {room.status === 'lobby' && (
-        <Lobby
-          room={room}
-          me={me}
-          isHost={room.hostPlayerId === session.playerId}
-          toggleReady={toggleReady}
-          addBot={addBot}
-          setBotDifficulty={setBotDifficulty}
-          removeBot={removeBot}
-          leaveRoom={leaveRoom}
-          busy={lobbyBusy}
-          invite={() => shareRoom(room.id, apiUrl)}
-          showRules={() => setRulesFor(room.mode ?? 'classic4')}
-          updateSettings={updateSettings}
-        />
-      )}
-      {room.status === 'abandoned' && (
-        <AbandonedNotice
-          onNewTable={() => forgetSession('میز قبلی رها شده بود. حالا می‌تونی میز جدید بسازی.')}
-        />
-      )}
-      {room.status !== 'lobby' && room.status !== 'abandoned' && game && (
-        <GameTable
-          room={room}
-          game={game}
-          meId={session.playerId}
-          chooseSuit={chooseSuit}
-          play={play}
-          nextHand={nextHand}
-          requestRedeal={requestRedeal}
-          discard={discard}
-          draw={draw}
-          resolveDraw={resolveDraw}
-        />
-      )}
-      {toast && <Toast message={toast} onDismiss={() => setToast('')} />}
-      {starting && <StartOverlay />}
-      {rulesOverlay}
-    </main>
+    <TableScreen
+      room={room}
+      session={session}
+      me={me}
+      game={game}
+      apiUrl={apiUrl}
+      connection={connection}
+      toast={toast}
+      starting={starting}
+      lobbyBusy={lobbyBusy}
+      rulesOverlay={rulesOverlay}
+      setToast={setToast}
+      showRules={() => setRulesFor(room.mode ?? 'classic4')}
+      onNewTable={() => forgetSession('میز قبلی رها شده بود. حالا می‌تونی میز جدید بسازی.')}
+      lobby={{ toggleReady, addBot, setBotDifficulty, removeBot, leaveRoom, updateSettings }}
+      table={{ chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw }}
+      invite={() => shareRoom(room.id, apiUrl)}
+    />
   );
 }
-
