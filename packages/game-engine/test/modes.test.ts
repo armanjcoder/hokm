@@ -313,3 +313,64 @@ describe('hand rotation per mode', () => {
     expect(next.phase).toBe('waiting_for_trump');
   });
 });
+
+describe('a hand always terminates, even without a clear winner', () => {
+  /**
+   * Regression: three players share 17 tricks, so a hand can end 6-6-5 with
+   * nobody reaching the seven-trick target. The hand used to stay in `playing`
+   * with every hand empty, hanging the table forever.
+   */
+  function playSoloHand(seed: number, hands: number) {
+    let game = createGame(playersFor(3), { mode: 'solo3', rng: seededRng(seed) });
+    for (let i = 0; i < hands; i += 1) {
+      if (game.phase === 'waiting_for_trump') {
+        game = chooseTrump(game, seatOf(game, game.hakemSeat).id, 'hearts', seededRng(seed + i));
+      }
+      // Play until the phase moves on, or the cards genuinely run out.
+      while (game.phase === 'playing') {
+        const cardsLeft = ([0, 1, 2] as Seat[]).reduce<number>((n, s) => n + game.hands[s].length, 0);
+        if (cardsLeft === 0) break;
+        game = playTrick(game);
+      }
+      if (game.phase !== 'hand_complete') break;
+      game = continueToNextHand(game, seededRng(seed + 500 + i));
+    }
+    return game;
+  }
+
+  it('never strands a hand in the playing phase with no cards left', () => {
+    // Several consecutive hands, so a 6-6-5 split is certain to occur.
+    for (const seed of [1000, 1037, 1074]) {
+      const game = playSoloHand(seed, 16);
+      const cardsLeft = ([0, 1, 2] as Seat[]).reduce<number>((n, s) => n + game.hands[s].length, 0);
+      const stuck = game.phase === 'playing' && cardsLeft === 0;
+      expect(stuck).toBe(false);
+    }
+  });
+
+  it('awards a fully played hand to whoever took the most tricks', () => {
+    let game = createGame(playersFor(3), { mode: 'solo3', rng: seededRng(1000) });
+    game = chooseTrump(game, seatOf(game, game.hakemSeat).id, 'hearts', seededRng(1000));
+
+    // Advance to a hand that uses all seventeen tricks.
+    for (let i = 0; i < 16; i += 1) {
+      while (game.phase === 'playing') {
+        const left = ([0, 1, 2] as Seat[]).reduce<number>((n, s) => n + game.hands[s].length, 0);
+        if (left === 0) break;
+        game = playTrick(game);
+      }
+      if (game.phase !== 'hand_complete') break;
+      if (game.completedTricks.length === 17) {
+        const winner = game.handScore.winningTeam!;
+        for (const count of Object.values(game.handScore.tricks)) {
+          expect(game.handScore.tricks[winner]).toBeGreaterThanOrEqual(count);
+        }
+        return;
+      }
+      game = continueToNextHand(game, seededRng(2000 + i));
+      if (game.phase === 'waiting_for_trump') {
+        game = chooseTrump(game, seatOf(game, game.hakemSeat).id, 'hearts', seededRng(3000 + i));
+      }
+    }
+  });
+});

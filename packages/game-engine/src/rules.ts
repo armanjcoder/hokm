@@ -223,6 +223,19 @@ export function playCard(state: HokmGameState, playerId: string, cardId: string)
     );
   }
 
+  // In solo modes the tricks can split so that nobody ever reaches the target
+  // (17 tricks across three players can end 6-6-5). Once the cards run out the
+  // hand must still finish, so the player with the most tricks takes it.
+  if (allTricksPlayed) {
+    const leader = teamsOf(config).reduce((best, team) =>
+      (tricks[team] ?? 0) > (tricks[best] ?? 0) ? team : best,
+    );
+    return finishHand(
+      { ...state, hands, completedTricks, currentTrick: completedTrick, handScore },
+      leader,
+    );
+  }
+
   return {
     ...state,
     hands,
