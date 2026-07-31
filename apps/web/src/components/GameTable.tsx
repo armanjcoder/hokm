@@ -162,6 +162,7 @@ export function GameTable({
       {(game.phase === 'hand_complete' || game.phase === 'game_complete') && (
         <div className="glass result-card">
           <h2>{game.phase === 'game_complete' ? 'بازی تموم شد!' : 'راند تموم شد'}</h2>
+          <ScoreBadge handScore={game.handScore} />
           <p>{game.lastEvent}</p>
           {game.phase === 'hand_complete' && (
             <button className="primary" onClick={nextHand}>
@@ -191,6 +192,26 @@ export function GameTable({
         )}
       </div>
     </section>
+  );
+}
+
+/** Explains why the round was worth 1, 2 or 3 points. */
+function ScoreBadge({ handScore }: { handScore: PublicGameView['handScore'] }) {
+  const { kind, pointsAwarded } = handScore;
+  if (!kind || pointsAwarded === undefined) return null;
+
+  const labels = {
+    normal: { text: 'برد عادی', className: 'normal' },
+    kot: { text: 'کوت! حریف هیچ دستی نبرد', className: 'kot' },
+    hakem_kot: { text: 'حاکم‌کوت! حاکم هیچ دستی نبرد', className: 'hakem-kot' },
+  } as const;
+  const label = labels[kind];
+
+  return (
+    <div className={`score-badge ${label.className}`}>
+      <strong>{label.text}</strong>
+      <span>+{pointsAwarded} امتیاز</span>
+    </div>
   );
 }
 

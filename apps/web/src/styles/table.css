@@ -38,3 +38,10 @@
 .draw-actions { display: flex; gap: 10px; }
 .draw-decision small { color: #a8a8ba; line-height: 1.7; font-size: 12px; }
 .target-note { color: #8fe8d5; }
+
+.score-badge { display: grid; gap: 4px; justify-items: center; margin: 10px 0 6px; padding: 10px 14px; border-radius: 18px; font-size: 14px; }
+.score-badge strong { font-size: 15px; }
+.score-badge span { font-weight: 800; font-size: 18px; }
+.score-badge.normal { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); color: #dcdce8; }
+.score-badge.kot { background: rgba(0,212,170,.14); border: 1px solid rgba(0,212,170,.4); color: #8fe8d5; }
+.score-badge.hakem-kot { background: rgba(255,200,87,.16); border: 1px solid rgba(255,200,87,.45); color: #ffd98a; }
