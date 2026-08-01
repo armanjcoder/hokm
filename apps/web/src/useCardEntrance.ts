@@ -27,10 +27,11 @@ function prefersReducedMotion(): boolean {
 /**
  * How far a played card travels, in pixels, before settling.
  *
- * Deliberately modest: the card should read as coming *from* its owner, not
- * fly across the whole screen. Anything larger reads as noise on a phone.
+ * Large enough that the flight is unmistakable at a glance. The earlier value
+ * was so small, and over so short a time, that the card effectively appeared
+ * instantly and the animation went unnoticed.
  */
-const TRAVEL = 62;
+const TRAVEL = 130;
 
 /**
  * Where a card starts its flight, per seat position.
@@ -60,7 +61,7 @@ const DEAL_KEYFRAMES: Keyframe[] = [
  */
 function landKeyframes(from: TablePosition | undefined): Keyframe[] {
   const origin = from ? ORIGIN[from] : { x: 0, y: -18 };
-  const tilt = origin.x === 0 ? 0 : origin.x < 0 ? -8 : 8;
+  const tilt = origin.x === 0 ? 0 : origin.x < 0 ? -14 : 14;
   return [
     {
       opacity: 0,
@@ -69,14 +70,24 @@ function landKeyframes(from: TablePosition | undefined): Keyframe[] {
     },
     {
       opacity: 1,
-      transform: `translate(${origin.x * 0.18}px, ${origin.y * 0.18}px) scale(1.05) rotate(${tilt * 0.25}deg)`,
-      offset: 0.62,
+      transform: `translate(${origin.x * 0.42}px, ${origin.y * 0.42}px) scale(1.04) rotate(${tilt * 0.5}deg)`,
+      offset: 0.45,
+    },
+    {
+      opacity: 1,
+      transform: `translate(${origin.x * 0.08}px, ${origin.y * 0.08}px) scale(1.06) rotate(${tilt * 0.12}deg)`,
+      offset: 0.78,
     },
     { opacity: 1, transform: 'translate(0, 0) scale(1) rotate(0deg)', offset: 1 },
   ];
 }
 
-const DURATION: Record<EntranceKind, number> = { deal: 380, land: 340 };
+/**
+ * A played card is the single most important event on the table, so its flight
+ * is given real time on screen. Dealing stays brisk because it happens to many
+ * cards at once and would otherwise feel sluggish.
+ */
+const DURATION: Record<EntranceKind, number> = { deal: 420, land: 620 };
 
 /** Cards after this position share the last delay, so long hands stay snappy. */
 const MAX_STAGGER_STEPS = 12;

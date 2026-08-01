@@ -10,6 +10,9 @@ import type { RoomPlayer } from './types.js';
  * Keeping this as plain data (no JSX) makes every arrangement directly testable.
  */
 
+/** Phases in which some seat is genuinely waiting to act. */
+const ACTIONABLE_PHASES = new Set(['playing', 'discarding', 'drawing']);
+
 /** Where a seat is drawn on screen, relative to the viewer. */
 export type TablePosition = 'bottom' | 'left' | 'top' | 'right';
 
@@ -71,14 +74,18 @@ export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOption
 
   // Keyed by plain seat numbers so lookups do not depend on the branded Seat
   // type flowing through unchanged.
-  // Between tricks the engine has already emptied the current one, so fall back
-  // to the trick that just finished. `useTrickHold` may also have substituted
-  // the completed trick in place of the live one, in which case it arrives here
-  // carrying its own `winnerSeat` and is used directly.
-  const finished = lastCompletedTrick(game);
-  const resolving = game.currentTrick.plays.length === 0 ? finished : undefined;
-  const visiblePlays = resolving?.plays ?? game.currentTrick.plays;
-  const winnerSeat = resolving?.winnerSeat ?? game.currentTrick.winnerSeat;
+  // Whatever trick is in `currentTrick` is what gets drawn. Deciding how long a
+  // finished trick stays visible belongs to `useTrickHold`, which substitutes
+  // the completed trick for a few seconds and then stops. Falling back to
+  // `completedTricks` here as well would keep the cards on the table
+  // indefinitely, long after that hold expired.
+  const visiblePlays = game.currentTrick.plays;
+  const winnerSeat = game.currentTrick.winnerSeat;
+
+  // A turn only exists while someone can actually act. Between hands, and while
+  // a finished trick is being held on screen, the engine still reports a seat,
+  // and highlighting it would point at a player who cannot move yet.
+  const awaitingAction = ACTIONABLE_PHASES.has(game.phase) && winnerSeat === undefined;
 
   const playedBySeat = new Map<number, SeatView['playedCard']>(
     visiblePlays.map((play) => [Number(play.seat), play.card]),
@@ -106,7 +113,7 @@ export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOption
       team,
       isMyTeam: config.teamPlay && team === myTeam,
       isHakem: seat === game.hakemSeat,
-      isTurn: seat === game.currentTurnSeat,
+      isTurn: awaitingAction && seat === game.currentTurnSeat,
       cardCount: countBySeat.get(seat),
       playedCard: playedBySeat.get(seat),
       wonTrick: winnerSeat !== undefined && Number(winnerSeat) === seat,
@@ -157,8 +164,20 @@ export function lastCompletedTrick(game: PublicGameView) {
 
 /** Whose turn it is, phrased for the turn banner. */
 export function turnMessage(seats: SeatView[]): string {
+  const winner = seats.find((view) => view.wonTrick);
+  if (winner) {
+    return winner.isSelf ? 'این دست را بردی' : `${seatLabel(winner)} این دست را برد`;
+  }
   const active = seats.find((view) => view.isTurn);
-  if (!active) return '';
+  if (!active) return 'صبر کن…';
   if (active.isSelf) return 'نوبت توئه';
   return `نوبت ${seatLabel(active)}`;
+}
+
+/** Names of the players on each side, for the team score headings. */
+export function teamRosters(seats: SeatView[]): { ours: string[]; theirs: string[] } {
+  return {
+    ours: seats.filter((view) => view.isMyTeam).map(seatLabel),
+    theirs: seats.filter((view) => !view.isMyTeam).map(seatLabel),
+  };
 }

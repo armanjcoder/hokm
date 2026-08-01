@@ -41,6 +41,25 @@
   font-size: var(--text-xl);
 }
 
+/* Your own side is tinted to match the violet seat badges on the table, so the
+   score strip and the ring agree on which side is which. */
+.score--ours {
+  border-color: rgba(157, 134, 255, 0.4);
+  background: rgba(124, 92, 255, 0.12);
+}
+
+.score__members {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .round-info {
   display: grid;
   place-items: center;
@@ -69,6 +88,8 @@
     '.    bottom .';
   grid-template-columns: 1fr minmax(0, 1.1fr) 1fr;
   grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Cards travel across seat boundaries while landing. */
+  overflow: visible;
 }
 
 /* Two player: nobody sits left or right, so give the core the full width. */
@@ -209,11 +230,29 @@
   color: var(--danger-text);
 }
 
-/* The active seat is marked with a ring *and* a label, never colour alone. */
+/* The active seat is marked with a ring, a tint and a pulse, never colour
+   alone: the same seat also carries a "نوبت" tag for anyone who cannot rely on
+   the highlight. */
 .table-seat.is-turn .table-seat__badge {
   border-color: var(--accent);
-  background: rgba(0, 212, 170, 0.14);
-  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.16);
+  background: rgba(0, 212, 170, 0.18);
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.22);
+  animation: seat-turn-pulse 1.8s var(--ease-in-out) infinite;
+}
+
+@keyframes seat-turn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 212, 170, 0.1);
+  }
+}
+
+.tag--turn {
+  background: rgba(0, 212, 170, 0.24);
+  color: var(--accent-text);
 }
 
 .table-seat.is-offline {
@@ -231,6 +270,9 @@
   /* Fixed box so seats never resize when a card lands or is cleared. */
   min-height: 84px;
   min-width: 58px;
+  /* A played card flies in from well outside this box, so the slot must not
+     clip it mid-flight. */
+  overflow: visible;
 }
 
 .table-seat__empty-slot {

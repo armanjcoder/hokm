@@ -52,6 +52,7 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
             {view.player?.isBot && <span aria-hidden="true"> 🤖</span>}
           </strong>
           <span className="table-seat__tags">
+            {view.isTurn && <em className="tag tag--turn">نوبت</em>}
             {view.isHakem && <em className="tag tag--hakem">حاکم</em>}
             {view.isSelf && <em className="tag tag--self">تو</em>}
             {view.isPartner && <em className="tag tag--partner">یار</em>}

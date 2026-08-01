@@ -129,12 +129,11 @@ describe('a played card really animates', () => {
     expect(calls).toHaveLength(1);
   });
 
-  it('lands faster than it deals, because it is a shorter move', () => {
-    render(<PlayingCard card={card('x')} played />);
-    const landing = Number(calls[0]!.options.duration);
-    calls = [];
-    render(<PlayingCard card={card('y')} />);
-    expect(landing).toBeLessThan(Number(calls[0]!.options.duration));
+  it('gives the flight enough time to actually be seen', () => {
+    // At 340ms over a short distance the card effectively appeared instantly
+    // and players reported never noticing the animation at all.
+    render(<PlayingCard card={card('x')} played from="left" />);
+    expect(Number(calls[0]!.options.duration)).toBeGreaterThanOrEqual(500);
   });
 });
 
@@ -220,9 +219,17 @@ describe('a played card flies in from its owner side', () => {
     expect(last.opacity).toBe(1);
   });
 
-  it('eases through a midpoint so the card reads as thrown, not teleported', () => {
+  it('eases through midpoints so the card reads as thrown, not teleported', () => {
     render(<PlayingCard card={card('c')} played from="left" />);
-    expect(calls[calls.length - 1]!.keyframes).toHaveLength(3);
+    expect(calls[calls.length - 1]!.keyframes.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('travels far enough to be noticed', () => {
+    render(<PlayingCard card={card('c')} played from="left" />);
+    const distance = Number(
+      String(calls[calls.length - 1]!.keyframes[0]!.transform).match(/translate\((-?\d+)px/)?.[1],
+    );
+    expect(Math.abs(distance)).toBeGreaterThanOrEqual(100);
   });
 
   it('still animates when the origin is unknown', () => {
@@ -231,9 +238,10 @@ describe('a played card flies in from its owner side', () => {
     expect(startTransform()).toMatch(/translate/);
   });
 
-  it('keeps the flight short enough to stay snappy', () => {
+  it('still finishes well within the trick hold', () => {
+    // The flight must be over long before the finished trick is cleared.
     render(<PlayingCard card={card('c')} played from="top" />);
-    expect(Number(calls[calls.length - 1]!.options.duration)).toBeLessThanOrEqual(400);
+    expect(Number(calls[calls.length - 1]!.options.duration)).toBeLessThan(1000);
   });
 });
 

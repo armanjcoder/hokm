@@ -4,6 +4,7 @@ import {
   buildSeatViews,
   seatInitials,
   seatLabel,
+  teamRosters,
   turnMessage,
   type SeatView,
 } from '../src/table-seats.js';
@@ -31,6 +32,7 @@ function game(overrides: Partial<PublicGameView> = {}): PublicGameView {
   return {
     hakemSeat: 0,
     currentTurnSeat: 0,
+    phase: 'playing',
     currentTrick: { plays: [] },
     players: [],
     ...overrides,
@@ -245,68 +247,169 @@ describe('team colour is relative to the viewer', () => {
   });
 });
 
-describe('the finished trick stays visible until the next one starts', () => {
+describe('team colour is relative to the viewer', () => {
+  it.each([0, 1, 2, 3])('marks the viewer own side consistently from seat %i', (mySeat) => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game(),
+      mySeat,
+    });
+    const ours = views.filter((v) => v.isMyTeam).map((v) => v.position).sort();
+    const theirs = views.filter((v) => !v.isMyTeam).map((v) => v.position).sort();
+    // Whichever seat you sit in, your side is always you plus the seat opposite.
+    expect(ours).toEqual(['bottom', 'top']);
+    expect(theirs).toEqual(['left', 'right']);
+  });
+
+  it('counts the viewer as part of their own team', () => {
+    const views = buildSeatViews({ mode: 'classic4', players: players(4), game: game(), mySeat: 2 });
+    expect(views.find((v) => v.isSelf)!.isMyTeam).toBe(true);
+  });
+
+  it('never assigns a team side in solo modes', () => {
+    for (const mode of ['solo3', 'duel2'] as const) {
+      const views = buildSeatViews({
+        mode,
+        players: players(mode === 'solo3' ? 3 : 2),
+        game: game(),
+        mySeat: 0,
+      });
+      expect(views.every((v) => !v.isMyTeam)).toBe(true);
+    }
+  });
+});
+
+
+describe('the seat ring draws only the trick it is given', () => {
   const card = (id: string) => ({ id, suit: 'spades', rank: 'A' }) as never;
 
-  it('keeps showing the last trick while the current one is empty', () => {
+  it('shows the cards in the current trick', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({
+        currentTrick: { plays: [{ seat: 2, card: card('c2') }] },
+      } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(views.find((v) => v.seat === 2)!.playedCard!.id).toBe('c2');
+  });
+
+  it('shows nothing once the trick is cleared', () => {
+    // How long a finished trick lingers is decided by `useTrickHold`, not here.
+    // Falling back to `completedTricks` in this function as well used to leave
+    // the cards on the table indefinitely.
     const views = buildSeatViews({
       mode: 'classic4',
       players: players(4),
       game: game({
         currentTrick: { plays: [] },
-        completedTricks: [
-          {
-            leaderSeat: 0,
-            winnerSeat: 2,
-            plays: [0, 1, 2, 3].map((seat) => ({ seat, card: card(`c${seat}`) })),
-          },
-        ],
-      } as unknown as Partial<PublicGameView>),
-      mySeat: 0,
-    });
-    // All four cards are still on the table rather than blanking instantly.
-    expect(views.filter((v) => v.playedCard).length).toBe(4);
-    expect(views.find((v) => v.wonTrick)!.seat).toBe(2);
-  });
-
-  it('prefers the live trick once the next card is played', () => {
-    const views = buildSeatViews({
-      mode: 'classic4',
-      players: players(4),
-      game: game({
-        currentTrick: { plays: [{ seat: 1, card: card('live') }] },
         completedTricks: [
           { leaderSeat: 0, winnerSeat: 2, plays: [{ seat: 0, card: card('old') }] },
         ],
       } as unknown as Partial<PublicGameView>),
       mySeat: 0,
     });
-    expect(views.filter((v) => v.playedCard).length).toBe(1);
-    expect(views.find((v) => v.seat === 1)!.playedCard!.id).toBe('live');
-    expect(views.every((v) => !v.wonTrick)).toBe(true);
+    expect(views.every((v) => !v.playedCard)).toBe(true);
   });
 
-  it('ignores a trick that has no recorded winner', () => {
+  it('marks the winner when the held trick carries one', () => {
     const views = buildSeatViews({
       mode: 'classic4',
       players: players(4),
       game: game({
-        currentTrick: { plays: [] },
-        completedTricks: [{ leaderSeat: 0, plays: [{ seat: 0, card: card('x') }] }],
+        currentTrick: { winnerSeat: 3, plays: [{ seat: 3, card: card('w') }] },
       } as unknown as Partial<PublicGameView>),
       mySeat: 0,
     });
-    expect(views.every((v) => !v.playedCard)).toBe(true);
-    expect(views.every((v) => !v.wonTrick)).toBe(true);
+    expect(views.find((v) => v.wonTrick)!.seat).toBe(3);
   });
 
-  it('copes with a game that has no completed tricks yet', () => {
+  it('never marks a turn while a finished trick is on screen', () => {
     const views = buildSeatViews({
       mode: 'classic4',
       players: players(4),
-      game: game({ currentTrick: { plays: [] } } as unknown as Partial<PublicGameView>),
+      game: game({
+        currentTurnSeat: 1,
+        currentTrick: { winnerSeat: 3, plays: [{ seat: 3, card: card('w') }] },
+      } as unknown as Partial<PublicGameView>),
       mySeat: 0,
     });
-    expect(views.every((v) => !v.wonTrick)).toBe(true);
+    expect(views.every((v) => !v.isTurn)).toBe(true);
+  });
+
+  it.each(['hand_complete', 'game_complete', 'waiting_for_trump'])(
+    'never marks a turn during %s',
+    (phase) => {
+      const views = buildSeatViews({
+        mode: 'classic4',
+        players: players(4),
+        game: game({ phase, currentTurnSeat: 2 } as unknown as Partial<PublicGameView>),
+        mySeat: 0,
+      });
+      expect(views.every((v) => !v.isTurn)).toBe(true);
+    },
+  );
+});
+
+describe('team rosters name who is on each side', () => {
+  it('lists your side and theirs by name', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game(),
+      mySeat: 0,
+    });
+    const { ours, theirs } = teamRosters(views);
+    expect(ours).toEqual(['آرمان', 'رضا']);
+    expect(theirs).toEqual(['سارا', 'مینا']);
+  });
+
+  it('follows the viewer, so seat 1 sees a different pairing', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game(),
+      mySeat: 1,
+    });
+    const { ours } = teamRosters(views);
+    expect(ours).toEqual(['سارا', 'مینا']);
+  });
+});
+
+describe('turn message', () => {
+  it('announces the trick winner while the trick is held', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({
+        currentTrick: { winnerSeat: 1, plays: [{ seat: 1, card: { id: 'x' } as never }] },
+      } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(turnMessage(views)).toBe('سارا این دست را برد');
+  });
+
+  it('says so when you won it', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({
+        currentTrick: { winnerSeat: 0, plays: [{ seat: 0, card: { id: 'x' } as never }] },
+      } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(turnMessage(views)).toBe('این دست را بردی');
+  });
+
+  it('never goes blank when nobody can act', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ phase: 'hand_complete' } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(turnMessage(views)).toBe('صبر کن…');
   });
 });

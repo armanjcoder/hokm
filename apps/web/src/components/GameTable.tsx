@@ -5,7 +5,7 @@ import { PlayingCard } from './PlayingCard.js';
 import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
 import { TableSeat } from './TableSeat.js';
-import { buildSeatViews, turnMessage } from '../table-seats.js';
+import { buildSeatViews, teamRosters, turnMessage } from '../table-seats.js';
 import { useTrickHold } from '../useTrickHold.js';
 
 export interface GameTableProps {
@@ -66,15 +66,31 @@ export function GameTable({
 
   const discarding = game.phase === 'discarding' && !iHaveDiscarded;
   const seats = buildSeatViews({ mode: game.mode, players: room.players, game, mySeat: me?.seat });
+  const rosters = teamRosters(seats);
+  // Scores are keyed by absolute team index, but the strip is labelled from the
+  // viewer's side so "our team" always sits on the same side of the screen.
+  const myTeam = config.teamPlay ? (me?.seat ?? 0) % 2 : (me?.seat ?? 0);
+  const theirTeam = config.teamPlay ? 1 - myTeam : undefined;
 
   return (
     <section className="table-wrap">
       <div className="score-strip">
         {config.teamPlay ? (
           <>
-            <Score title="تیم ۱" match={game.matchScore[0] ?? 0} tricks={game.handScore.tricks[0] ?? 0} />
+            <Score
+              title="تیم ما"
+              ours
+              members={rosters.ours}
+              match={game.matchScore[myTeam] ?? 0}
+              tricks={game.handScore.tricks[myTeam] ?? 0}
+            />
             <RoundInfo game={game} hakemName={hakem?.name} />
-            <Score title="تیم ۲" match={game.matchScore[1] ?? 0} tricks={game.handScore.tricks[1] ?? 0} />
+            <Score
+              title="حریف"
+              members={rosters.theirs}
+              match={game.matchScore[theirTeam ?? 1] ?? 0}
+              tricks={game.handScore.tricks[theirTeam ?? 1] ?? 0}
+            />
           </>
         ) : (
           <>
