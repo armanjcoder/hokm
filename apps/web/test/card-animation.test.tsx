@@ -282,3 +282,108 @@ describe('the entrance releases the element when it ends', () => {
     expect(String(last.transform)).toContain('scale(1)');
   });
 });
+
+describe('a finished trick is collected by the winner', () => {
+  it('starts an exit animation on the card', () => {
+    // Previously the exit was a CSS transition that never ran, because the
+    // entrance animation outranks CSS on `transform`. The cards simply
+    // disappeared instead of travelling to the winner.
+    render(<PlayingCard card={card('c1')} played from="left" exitTowards="top" />);
+    expect(calls).toHaveLength(1);
+    const last = calls[0]!.keyframes.at(-1)!;
+    expect(last.opacity).toBe(0);
+  });
+
+  it('travels towards the winning seat, not its own', () => {
+    render(<PlayingCard card={card('c1')} played from="left" exitTowards="right" />);
+    const last = calls[0]!.keyframes.at(-1)!;
+    expect(String(last.transform)).toMatch(/translate\(\d+px/);
+  });
+
+  it.each([
+    ['top', /translate\(0px,\s*-\d+px/],
+    ['bottom', /translate\(0px,\s*\d+px/],
+    ['left', /translate\(-\d+px/],
+    ['right', /translate\(\d+px/],
+  ])('exits towards %s', (side, pattern) => {
+    render(<PlayingCard card={card('c1')} played exitTowards={side as never} />);
+    expect(String(calls[0]!.keyframes.at(-1)!.transform)).toMatch(pattern as RegExp);
+  });
+
+  it('starts from the resting position so the move is continuous', () => {
+    render(<PlayingCard card={card('c1')} played exitTowards="top" />);
+    const first = calls[0]!.keyframes[0]!;
+    expect(first.opacity).toBe(1);
+    expect(String(first.transform)).toContain('translate(0, 0)');
+  });
+
+  it('holds the card hidden once collected, so it cannot reappear', () => {
+    render(<PlayingCard card={card('c1')} played exitTowards="top" />);
+    expect(calls[0]!.options.fill).toBe('forwards');
+  });
+
+  it('replaces the entrance rather than running alongside it', () => {
+    // Two animations on the same property would fight; the exit cancels first.
+    const cancelled: string[] = [];
+    (Element.prototype as unknown as { getAnimations: unknown }).getAnimations = function () {
+      return [{ cancel: () => cancelled.push('entrance') }] as unknown as Animation[];
+    };
+    render(<PlayingCard card={card('c1')} played exitTowards="top" />);
+    expect(cancelled).toContain('entrance');
+  });
+
+  it('travels further than the entrance, so the exit reads clearly', () => {
+    render(<PlayingCard card={card('a')} played from="left" />);
+    const entry = Math.abs(
+      Number(String(calls[0]!.keyframes[0]!.transform).match(/translate\((-?\d+)px/)?.[1]),
+    );
+    calls = [];
+    render(<PlayingCard card={card('b')} played exitTowards="left" />);
+    const exit = Math.abs(
+      Number(String(calls[0]!.keyframes.at(-1)!.transform).match(/translate\((-?\d+)px/)?.[1]),
+    );
+    expect(exit).toBeGreaterThan(entry);
+  });
+
+  it('still hides a collected card when motion is reduced', () => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+    const { container } = render(<PlayingCard card={card('c1')} played exitTowards="top" />);
+    expect(calls).toHaveLength(0);
+    expect((container.querySelector('.card') as HTMLElement).style.opacity).toBe('0');
+  });
+});
+
+describe('the seat hands the exit direction to its card', () => {
+  it('animates the card out when the seat is sweeping', () => {
+    // Testing PlayingCard alone would miss the wiring: the sweep shipped twice
+    // while the prop was never passed down at all.
+    render(<TableSeat view={seatView('c1')} teamPlay sweepTo="top" />);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.keyframes.at(-1)!.opacity).toBe(0);
+  });
+
+  it('does not animate out when the trick is still being read', () => {
+    render(<TableSeat view={seatView('c1')} teamPlay />);
+    expect(calls[0]!.keyframes.at(-1)!.opacity).toBe(1);
+  });
+
+  it('sends the card to the winner, whichever seat that is', () => {
+    render(<TableSeat view={seatView('c1')} teamPlay sweepTo="right" />);
+    expect(String(calls[0]!.keyframes.at(-1)!.transform)).toMatch(/translate\(\d+px/);
+  });
+
+  it('also collects stacked hakem draw cards', () => {
+    const withDraw = {
+      ...seatView(undefined),
+      drawCards: [card('d1'), card('d2')],
+    } as unknown as SeatView;
+    render(<TableSeat view={withDraw} teamPlay sweepTo="bottom" />);
+    expect(calls).toHaveLength(2);
+    expect(calls.every((c) => c.keyframes.at(-1)!.opacity === 0)).toBe(true);
+  });
+});

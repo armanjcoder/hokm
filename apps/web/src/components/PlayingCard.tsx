@@ -29,6 +29,8 @@ export function PlayingCard({
   dealReady = true,
   /** Seat this card was played from, so it flies in from that side. */
   from,
+  /** Set while a finished trick is being collected by the winning seat. */
+  exitTowards,
 }: {
   card: Card;
   disabled?: boolean;
@@ -40,6 +42,7 @@ export function PlayingCard({
   played?: boolean;
   dealReady?: boolean;
   from?: TablePosition;
+  exitTowards?: TablePosition | undefined;
 }) {
   const suit = suitMeta(card.suit);
   const label = `${card.rank} ${suit.label}`;
@@ -51,6 +54,7 @@ export function PlayingCard({
     enabled: played || dealReady,
     replayKey: card.id,
     ...(from ? { from } : {}),
+    ...(exitTowards ? { exitTowards } : {}),
   });
   const classes = ['card', suit.color, compact && 'compact', selected && 'selected', disabled && 'is-blocked']
     .filter(Boolean)

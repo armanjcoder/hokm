@@ -2,17 +2,16 @@ import { useEffect, useRef } from 'react';
 import type { TablePosition } from './table-seats.js';
 
 /**
- * Plays a card's entrance with the Web Animations API instead of a CSS class.
+ * Animates a card with the Web Animations API instead of CSS classes.
  *
- * CSS mount animations proved unreliable here. They depend on the element being
- * *inserted* while the rule already applies, which quietly fails whenever React
- * reuses a node, whenever the class is added a frame late, and in some in-app
- * WebViews. Nothing about that is visible from the markup, which is exactly why
- * the bug survived several rounds of "the CSS is definitely there".
+ * CSS mount animations proved unreliable here: they only run when the element
+ * is *inserted* while the rule already applies, which quietly fails whenever
+ * React reuses a node or adds the class a frame late.
  *
- * Calling `element.animate()` sidesteps all of it: the animation is started
- * imperatively on a node we hold a reference to, so it either runs or throws.
- * It also degrades safely, because `animate` is feature-detected.
+ * The exit is driven by the same API for a related reason. Mixing a CSS
+ * transition with `element.animate()` on the same property does not work,
+ * because a running animation owns `transform` in a cascade origin above all
+ * CSS, so the transition is simply ignored. One owner per property, one API.
  */
 
 export type EntranceKind = 'deal' | 'land';
@@ -27,11 +26,12 @@ function prefersReducedMotion(): boolean {
 /**
  * How far a played card travels, in pixels, before settling.
  *
- * Large enough that the flight is unmistakable at a glance. The earlier value
- * was so small, and over so short a time, that the card effectively appeared
- * instantly and the animation went unnoticed.
+ * Large enough that the flight is unmistakable at a glance.
  */
 const TRAVEL = 130;
+
+/** How far a collected card travels on its way to the winner. */
+const EXIT_TRAVEL = 190;
 
 /**
  * Where a card starts its flight, per seat position.
@@ -56,7 +56,7 @@ const DEAL_KEYFRAMES: Keyframe[] = [
 /**
  * Played onto the table: flies in from its owner's side and settles.
  *
- * The midpoint keeps a little scale and rotation so the card feels thrown
+ * The midpoints keep a little scale and rotation so the card feels thrown
  * rather than teleported, then the last frame lands it flat and square.
  */
 function landKeyframes(from: TablePosition | undefined): Keyframe[] {
@@ -82,12 +82,27 @@ function landKeyframes(from: TablePosition | undefined): Keyframe[] {
   ];
 }
 
-/**
- * A played card is the single most important event on the table, so its flight
- * is given real time on screen. Dealing stays brisk because it happens to many
- * cards at once and would otherwise feel sluggish.
- */
+/** Collected by the winner: slides off towards their seat and fades out. */
+export function exitKeyframes(towards: TablePosition): Keyframe[] {
+  const target = ORIGIN[towards];
+  const dx = target.x === 0 ? 0 : (target.x / TRAVEL) * EXIT_TRAVEL;
+  const dy = target.y === 0 ? 0 : (target.y / TRAVEL) * EXIT_TRAVEL;
+  const tilt = dx === 0 ? 0 : dx < 0 ? -10 : 10;
+  return [
+    { opacity: 1, transform: 'translate(0, 0) scale(1) rotate(0deg)', offset: 0 },
+    { opacity: 1, transform: `translate(${dx * 0.25}px, ${dy * 0.25}px) scale(1.04)`, offset: 0.25 },
+    {
+      opacity: 0,
+      transform: `translate(${dx}px, ${dy}px) scale(0.66) rotate(${tilt}deg)`,
+      offset: 1,
+    },
+  ];
+}
+
 const DURATION: Record<EntranceKind, number> = { deal: 520, land: 900 };
+
+/** How long a collected card takes to reach the winner. */
+export const EXIT_DURATION_MS = 620;
 
 /** Cards after this position share the last delay, so long hands stay snappy. */
 const MAX_STAGGER_STEPS = 12;
@@ -103,6 +118,11 @@ export interface EntranceOptions {
   replayKey?: string;
   /** Seat the card was played from, so it can fly in from that side. */
   from?: TablePosition;
+  /**
+   * Seat the finished trick is being collected by. Set only while the cards are
+   * sweeping away; it takes over from the entrance and drives the exit.
+   */
+  exitTowards?: TablePosition | undefined;
 }
 
 /** Returns a ref to attach to the card element. */
@@ -112,6 +132,7 @@ export function useCardEntrance({
   enabled = true,
   replayKey,
   from,
+  exitTowards,
 }: EntranceOptions) {
   const ref = useRef<HTMLButtonElement>(null);
 
@@ -119,7 +140,26 @@ export function useCardEntrance({
     const element = ref.current;
     if (!element || !enabled) return;
     if (typeof element.animate !== 'function') return;
-    if (prefersReducedMotion()) return;
+
+    // The exit must still leave the card hidden when motion is reduced,
+    // otherwise a collected trick would sit on the table forever.
+    if (prefersReducedMotion()) {
+      if (exitTowards) element.style.opacity = '0';
+      return;
+    }
+
+    if (exitTowards) {
+      // Cancel any lingering entrance first: two animations on the same
+      // property would otherwise both apply and the later one would not win
+      // cleanly. `forwards` keeps the card hidden until React removes it.
+      element.getAnimations?.().forEach((animation) => animation.cancel());
+      const exit = element.animate(exitKeyframes(exitTowards), {
+        duration: EXIT_DURATION_MS,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+        fill: 'forwards',
+      });
+      return () => exit.cancel();
+    }
 
     const delay = kind === 'deal' ? Math.min(index, MAX_STAGGER_STEPS) * STAGGER_MS : 0;
     const animation = element.animate(
@@ -128,17 +168,15 @@ export function useCardEntrance({
         duration: DURATION[kind],
         delay,
         easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-        // `backwards`, never `both`. A filled-forwards animation keeps
-        // overriding `transform` and `opacity` after it ends, which outranks
-        // CSS and silently defeats the sweep that collects a finished trick.
-        // Filling backwards still holds the first keyframe during the stagger
-        // delay, so a card never flashes at full size before its turn.
+        // `backwards` holds the first keyframe during the stagger delay so a
+        // card never flashes at full size before its turn, then releases the
+        // element once it has settled.
         fill: 'backwards',
       },
     );
 
     return () => animation.cancel();
-  }, [kind, index, enabled, replayKey, from]);
+  }, [kind, index, enabled, replayKey, from, exitTowards]);
 
   return ref;
 }

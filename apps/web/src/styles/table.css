@@ -699,36 +699,8 @@
   z-index: calc(var(--stack-depth, 0) + 1);
 }
 
-/* Collecting a finished trick.
-   Once everyone has had time to read the cards, they slide off towards the
-   seat that won them and fade out. Making the cards physically travel to the
-   winner is what tells the table who took the trick, rather than expecting
-   players to notice a highlight. */
-.table-seat__played.is-sweeping > * {
-  transition:
-    transform var(--duration-slow) var(--ease-in-out),
-    opacity var(--duration-slow) var(--ease-in-out);
-  opacity: 0;
-}
+/* Collecting a finished trick is animated in `useCardEntrance`, not here.
+   A CSS transition cannot move these cards: the entrance runs through the Web
+   Animations API, which owns `transform` in a cascade origin above all CSS, so
+   a transition on the same property is silently ignored. */
 
-.table-seat__played.is-sweeping.sweep-top > * {
-  transform: translateY(-160px) scale(0.7);
-}
-
-.table-seat__played.is-sweeping.sweep-bottom > * {
-  transform: translateY(160px) scale(0.7);
-}
-
-.table-seat__played.is-sweeping.sweep-left > * {
-  transform: translateX(-160px) scale(0.7);
-}
-
-.table-seat__played.is-sweeping.sweep-right > * {
-  transform: translateX(160px) scale(0.7);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .table-seat__played.is-sweeping > * {
-    transform: none;
-  }
-}

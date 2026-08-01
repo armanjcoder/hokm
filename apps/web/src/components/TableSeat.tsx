@@ -73,7 +73,7 @@ export function TableSeat({
         </span>
       </div>
 
-      <div className={`table-seat__played ${sweepTo ? `is-sweeping sweep-${sweepTo}` : ''}`}>
+      <div className="table-seat__played">
         {(view.drawCards?.length ?? 0) > 0 ? (
           // The hakem draw can go round more than once, so each new card is
           // stacked slightly over the last rather than replacing it.
@@ -84,7 +84,13 @@ export function TableSeat({
                 className="draw-stack__card"
                 style={{ '--stack-depth': depth } as React.CSSProperties}
               >
-                <PlayingCard card={card!} compact played from={view.position} />
+                <PlayingCard
+                  card={card!}
+                  compact
+                  played
+                  from={view.position}
+                  {...(sweepTo ? { exitTowards: sweepTo } : {})}
+                />
               </span>
             ))}
           </span>
@@ -98,6 +104,7 @@ export function TableSeat({
             compact
             played
             from={view.position}
+            {...(sweepTo ? { exitTowards: sweepTo } : {})}
           />
         ) : (
           <span className="table-seat__empty-slot" aria-hidden="true" />

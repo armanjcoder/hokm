@@ -458,13 +458,10 @@ describe('cards sit where the table says they should', () => {
     expect(stackCard).toMatch(/inset:\s*0/);
   });
 
-  it('sweeps a finished trick towards each possible winner', () => {
-    for (const side of ['top', 'bottom', 'left', 'right']) {
-      expect(table).toContain(`.table-seat__played.is-sweeping.sweep-${side}`);
-    }
-  });
-
-  it('fades the swept cards out as they travel', () => {
-    expect(rule(table, '.table-seat__played.is-sweeping > *')).toMatch(/opacity:\s*0/);
+  it('does not try to sweep a trick with CSS', () => {
+    // The entrance uses the Web Animations API, which owns `transform` above
+    // all CSS, so a transition here is silently ignored. The exit lives in
+    // `useCardEntrance` and is covered by card-animation.test.tsx.
+    expect(table).not.toContain('is-sweeping');
   });
 });
