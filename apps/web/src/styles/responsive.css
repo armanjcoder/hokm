@@ -17,11 +17,6 @@
     height: 106px;
   }
 
-  .trump-picker {
-    max-width: 540px;
-    margin: auto;
-  }
-
   /* More room to breathe: the ring can afford full-size seats and a wider
      centre once the shell is no longer phone width. */
   .table-center {

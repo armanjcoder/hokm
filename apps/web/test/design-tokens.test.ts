@@ -465,3 +465,44 @@ describe('cards sit where the table says they should', () => {
     expect(table).not.toContain('is-sweeping');
   });
 });
+
+describe('the trump sheet is a real bottom sheet', () => {
+  const table = read(path.join(stylesDir, 'table.css'));
+  const responsive = read(path.join(stylesDir, 'responsive.css'));
+
+  function rule(css: string, selector: string): string {
+    const at = css.indexOf(`${selector} {`);
+    expect(at, `${selector} should exist`).toBeGreaterThan(-1);
+    return css.slice(at, css.indexOf('}', at));
+  }
+
+  it('anchors to the bottom of the screen, within thumb reach', () => {
+    const backdrop = rule(table, '.trump-backdrop');
+    expect(backdrop).toMatch(/position:\s*fixed/);
+    expect(backdrop).toMatch(/align-items:\s*flex-end/);
+  });
+
+  it('slides up rather than appearing', () => {
+    expect(table).toContain('@keyframes trump-sheet-in');
+    expect(rule(table, '@keyframes trump-sheet-in')).toBeTruthy();
+  });
+
+  it('clears the home indicator on notched phones', () => {
+    expect(rule(table, '.trump-sheet')).toContain('--safe-bottom');
+  });
+
+  it('gives each suit a generous tap target', () => {
+    const suit = rule(table, '.trump-suit');
+    const height = Number(suit.match(/min-height:\s*(\d+)px/)?.[1]);
+    expect(height).toBeGreaterThanOrEqual(44);
+  });
+
+  it('keeps the red suits distinguishable', () => {
+    expect(rule(table, '.trump-suit.red')).toContain('--card-red');
+  });
+
+  it('leaves no trace of the old floating picker', () => {
+    expect(table).not.toContain('.trump-picker');
+    expect(responsive).not.toContain('.trump-picker');
+  });
+});

@@ -505,47 +505,128 @@
    A CSS mount animation is invisible whenever React reuses the node, which is
    exactly what happens when a new card lands in a seat that already held one. */
 
-.trump-picker {
-  position: absolute;
-  inset: auto var(--space-2) 148px var(--space-2);
-  z-index: var(--z-picker);
-  padding: var(--space-4);
+/* Trump picker, as a bottom sheet.
+   Naming trump is the most consequential tap in a hand, so it takes the bottom
+   of the screen where a thumb naturally rests, rather than a small panel
+   floating over the table. */
+.trump-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-3);
+  background: rgba(6, 8, 16, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: trump-backdrop-in var(--duration-base) var(--ease-out) both;
+}
+
+.trump-sheet {
+  width: 100%;
+  max-width: 460px;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) calc(var(--space-5) + var(--safe-bottom));
+  border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-lg) var(--radius-lg);
+  background: linear-gradient(160deg, rgba(26, 22, 46, 0.98), rgba(14, 14, 26, 0.98));
+  border: 1px solid var(--surface-3);
+  box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.55);
+  animation: trump-sheet-in var(--duration-slow) var(--ease-out) both;
+}
+
+/* The familiar grab handle, so the panel reads as a sheet at a glance. */
+.trump-sheet__grip {
+  justify-self: center;
+  width: 42px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.trump-sheet__title {
+  margin: 0;
   text-align: center;
+  font-size: var(--text-md);
 }
 
-.trump-picker h3 {
-  margin: 0 0 var(--space-3);
+.trump-sheet__hint {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
 }
 
-.trump-picker div {
+.trump-sheet__suits {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: var(--space-2);
 }
 
-.trump-picker button {
-  min-height: 76px;
-  border-radius: var(--radius-xl);
-  background: rgba(255, 255, 255, 0.92);
+.trump-suit {
   display: grid;
   place-items: center;
-  gap: 2px;
-  font-weight: 800;
+  gap: var(--space-1);
+  /* Comfortably past the minimum tap target: this is a decisive, one-off tap. */
+  min-height: 84px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.94);
   color: var(--card-black);
+  font-weight: 800;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
-.trump-picker button.red {
+.trump-suit.red {
   color: var(--card-red);
 }
 
-.trump-picker button span:first-child {
+.trump-suit:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) {
+  .trump-suit:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.trump-suit__symbol {
   font-size: var(--text-2xl);
   line-height: 1;
 }
 
-.trump-picker button span:last-child {
+.trump-suit__label {
   font-size: var(--text-sm);
   font-weight: 700;
+}
+
+.trump-sheet__redeal {
+  font-size: var(--text-sm);
+}
+
+@keyframes trump-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes trump-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 .wait-card,

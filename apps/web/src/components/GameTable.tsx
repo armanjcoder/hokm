@@ -5,6 +5,7 @@ import { PlayingCard } from './PlayingCard.js';
 import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
 import { TableSeat } from './TableSeat.js';
+import { TrumpSheet } from './TrumpSheet.js';
 import { buildSeatViews, drawMessage, teamRosters, turnMessage } from '../table-seats.js';
 import { useTrickHold } from '../useTrickHold.js';
 import { useHakemDraw } from '../useHakemDraw.js';
@@ -125,32 +126,11 @@ export function GameTable({
       </div>
 
       {game.phase === 'waiting_for_trump' && isHakem && (
-        <div className="trump-picker glass">
-          <h3 id="trump-title">حکم رو انتخاب کن</h3>
-          <div role="group" aria-labelledby="trump-title">
-            {SUIT_META.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                className={s.color}
-                aria-label={`انتخاب حکم ${s.label}`}
-                onClick={() => chooseSuit(s.id)}
-              >
-                <span aria-hidden="true">{s.symbol}</span>
-                <span>{s.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-      {game.phase === 'waiting_for_trump' && isHakem && game.canRequestRedeal && (
-        <div className="glass wait-card phase-card redeal-card">
-          <h3>ده‌لو کم</h3>
-          <p>هیچ کارت عکس‌داری نداری. می‌توانی بخواهی کارت‌ها دوباره پخش شوند.</p>
-          <button className="ghost" type="button" onClick={requestRedeal}>
-            درخواست پخش دوباره
-          </button>
-        </div>
+        <TrumpSheet
+          onChoose={chooseSuit}
+          canRequestRedeal={Boolean(game.canRequestRedeal)}
+          onRequestRedeal={requestRedeal}
+        />
       )}
       {game.phase === 'waiting_for_trump' && !isHakem && (
         <div className="glass wait-card">منتظر انتخاب حکم توسط حاکم...</div>

@@ -264,6 +264,12 @@ describe('the pause is actually applied to the schedule', () => {
       }
       expect(justCompletedTrick(room)).toBe(true);
 
+      // The winner of that trick leads the next one. Whoever it was, make a bot
+      // the leader so there is always a move for the scheduler to delay;
+      // returning early here would let the real assertion be skipped silently.
+      room.game = { ...room.game!, currentTrick: { ...room.game!.currentTrick, leaderSeat: 1 } };
+      room.game = { ...room.game, currentTurnSeat: 1 };
+
       const completedBefore = room.game!.completedTricks.length;
       scheduleBotSteps(room, 100);
 

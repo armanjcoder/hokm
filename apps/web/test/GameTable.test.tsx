@@ -104,12 +104,12 @@ describe('low hand redeal (ده‌لو کم)', () => {
 
   it('offers the redeal to the hakem when the hand qualifies', () => {
     renderTable(waiting({ canRequestRedeal: true }));
-    expect(screen.getByText('درخواست پخش دوباره')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'ده‌لو کم دارم؛ دوباره پخش کن' })).toBeDefined();
   });
 
   it('hides it when the rule is off or the hand is strong', () => {
     renderTable(waiting({ canRequestRedeal: false }));
-    expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'ده‌لو کم دارم؛ دوباره پخش کن' })).toBeNull();
   });
 
   it('calls the handler when pressed', () => {
@@ -128,7 +128,7 @@ describe('low hand redeal (ده‌لو کم)', () => {
         resolveDraw={noop}
       />,
     );
-    fireEvent.click(screen.getByText('درخواست پخش دوباره'));
+    fireEvent.click(screen.getByRole('button', { name: 'ده‌لو کم دارم؛ دوباره پخش کن' }));
     expect(requestRedeal).toHaveBeenCalledTimes(1);
   });
 
@@ -147,7 +147,7 @@ describe('low hand redeal (ده‌لو کم)', () => {
         resolveDraw={noop}
       />,
     );
-    expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'ده‌لو کم دارم؛ دوباره پخش کن' })).toBeNull();
   });
 });
 
