@@ -1,24 +1,58 @@
 import { cleanup, render } from '@testing-library/react';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PlayingCard } from '../src/components/PlayingCard.js';
 import { TableSeat } from '../src/components/TableSeat.js';
-import { GameTable } from '../src/components/GameTable.js';
 import type { SeatView } from '../src/table-seats.js';
-import type { RoomView } from '../src/types.js';
-
-afterEach(cleanup);
 
 /**
- * Card animation.
+ * Card entrance animation.
  *
- * CSS mount animations are fragile in React for one specific reason: an
- * animation only plays when the element is *inserted*. If React reuses a DOM
- * node, the animation silently never replays. Three separate bugs of exactly
- * that shape shipped before these tests existed, so each is pinned here.
+ * These tests assert that an animation is *actually started on the element*,
+ * not merely that a class name is present. Earlier versions of this suite
+ * checked for a CSS class and passed happily while nothing moved on screen,
+ * because a CSS mount animation never replays when React reuses a DOM node.
+ *
+ * jsdom has no Web Animations implementation, so `Element.animate` is stubbed
+ * and the calls are inspected directly. That is the behaviour that matters:
+ * did we ask the browser to animate this element, with what, and for how long.
  */
 
+interface AnimateCall {
+  element: Element;
+  keyframes: Keyframe[];
+  options: KeyframeAnimationOptions;
+}
+
+let calls: AnimateCall[] = [];
+let cancelled = 0;
+
+beforeEach(() => {
+  calls = [];
+  cancelled = 0;
+  // jsdom does not implement animate(); the component feature-detects it, so a
+  // stub is required for the animation path to be exercised at all.
+  (Element.prototype as unknown as { animate: unknown }).animate = function (
+    this: Element,
+    keyframes: Keyframe[],
+    options: KeyframeAnimationOptions,
+  ) {
+    calls.push({ element: this, keyframes, options });
+    return { cancel: () => { cancelled += 1; } } as unknown as Animation;
+  };
+  window.matchMedia = ((query: string) => ({
+    matches: false,
+    media: query,
+    addEventListener() {},
+    removeEventListener() {},
+  })) as unknown as typeof window.matchMedia;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.restoreAllMocks();
+});
+
 const card = (id: string) => ({ id, suit: 'spades', rank: 'A' }) as never;
-const noop = () => {};
 
 function seatView(playedId: string | undefined): SeatView {
   return {
@@ -38,162 +72,110 @@ function seatView(playedId: string | undefined): SeatView {
   } as SeatView;
 }
 
-describe('a played card re-animates for every new card', () => {
-  it('mounts a fresh node when a different card lands in the same seat', () => {
-    // Without a key React reconciles by position and reuses the node, so the
-    // landing animation never restarts and the card appears instantly.
-    const { container, rerender } = render(<TableSeat view={seatView('c1')} teamPlay />);
-    const first = container.querySelector('.card');
+describe('a dealt card really animates', () => {
+  it('starts an animation on the card element', () => {
+    const { container } = render(<PlayingCard card={card('c1')} index={0} />);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.element).toBe(container.querySelector('.card'));
+  });
+
+  it('moves and fades in, rather than just appearing', () => {
+    render(<PlayingCard card={card('c1')} index={0} />);
+    const [from, to] = calls[0]!.keyframes;
+    expect(from!.opacity).toBe(0);
+    expect(String(from!.transform)).toMatch(/translateY/);
+    expect(to!.opacity).toBe(1);
+  });
+
+  it('runs for a visible length of time', () => {
+    render(<PlayingCard card={card('c1')} index={0} />);
+    expect(Number(calls[0]!.options.duration)).toBeGreaterThanOrEqual(200);
+  });
+
+  it('staggers later cards in the hand', () => {
+    render(<PlayingCard card={card('a')} index={0} />);
+    render(<PlayingCard card={card('b')} index={3} />);
+    expect(Number(calls[0]!.options.delay)).toBe(0);
+    expect(Number(calls[1]!.options.delay)).toBeGreaterThan(0);
+  });
+
+  it('caps the stagger so a seventeen card hand is not slow', () => {
+    render(<PlayingCard card={card('a')} index={12} />);
+    render(<PlayingCard card={card('b')} index={16} />);
+    expect(calls[1]!.options.delay).toBe(calls[0]!.options.delay);
+  });
+});
+
+describe('a played card really animates', () => {
+  it('animates when it lands in a seat', () => {
+    render(<TableSeat view={seatView('c1')} teamPlay />);
+    expect(calls).toHaveLength(1);
+    expect(String(calls[0]!.keyframes[0]!.transform)).toMatch(/translateY\(-/);
+  });
+
+  it('animates again when a different card lands in the same seat', () => {
+    // The exact failure that shipped: React reused the node, so a CSS mount
+    // animation never replayed and the card silently swapped.
+    const { rerender } = render(<TableSeat view={seatView('c1')} teamPlay />);
+    expect(calls).toHaveLength(1);
     rerender(<TableSeat view={seatView('c2')} teamPlay />);
-    const second = container.querySelector('.card');
-    expect(first).not.toBe(second);
+    expect(calls).toHaveLength(2);
   });
 
-  it('keeps the same node when nothing changed', () => {
-    const { container, rerender } = render(<TableSeat view={seatView('c1')} teamPlay />);
-    const first = container.querySelector('.card');
+  it('does not restart when nothing changed', () => {
+    const { rerender } = render(<TableSeat view={seatView('c1')} teamPlay />);
     rerender(<TableSeat view={seatView('c1')} teamPlay />);
-    expect(container.querySelector('.card')).toBe(first);
+    expect(calls).toHaveLength(1);
   });
 
-  it('carries the landing class rather than the dealing one', () => {
-    const { container } = render(<TableSeat view={seatView('c1')} teamPlay />);
-    const el = container.querySelector('.card')!;
-    expect(el.classList.contains('is-played')).toBe(true);
-    expect(el.classList.contains('is-dealt')).toBe(false);
+  it('lands faster than it deals, because it is a shorter move', () => {
+    render(<PlayingCard card={card('x')} played />);
+    const landing = Number(calls[0]!.options.duration);
+    calls = [];
+    render(<PlayingCard card={card('y')} />);
+    expect(landing).toBeLessThan(Number(calls[0]!.options.duration));
   });
 });
 
-describe('dealing waits for the start overlay', () => {
-  it('does not animate while the overlay still covers the table', () => {
-    // The overlay lasts far longer than the deal, so animating underneath it
-    // means the player never sees a single card move.
-    const { container } = render(<PlayingCard card={card('c1')} index={0} dealReady={false} />);
-    expect(container.querySelector('.card')!.classList.contains('is-dealt')).toBe(false);
+describe('the opening deal waits for the start overlay', () => {
+  it('does not animate while the overlay is covering the table', () => {
+    render(<PlayingCard card={card('c1')} index={0} dealReady={false} />);
+    expect(calls).toHaveLength(0);
   });
 
-  it('animates once the overlay has cleared', () => {
-    const { container } = render(<PlayingCard card={card('c1')} index={0} dealReady />);
-    expect(container.querySelector('.card')!.classList.contains('is-dealt')).toBe(true);
-  });
-
-  it('adds the class on the transition, which is what starts the animation', () => {
-    const { container, rerender } = render(
-      <PlayingCard card={card('c1')} index={0} dealReady={false} />,
-    );
-    expect(container.querySelector('.card')!.classList.contains('is-dealt')).toBe(false);
+  it('animates as soon as the overlay clears', () => {
+    const { rerender } = render(<PlayingCard card={card('c1')} index={0} dealReady={false} />);
+    expect(calls).toHaveLength(0);
     rerender(<PlayingCard card={card('c1')} index={0} dealReady />);
-    expect(container.querySelector('.card')!.classList.contains('is-dealt')).toBe(true);
+    expect(calls).toHaveLength(1);
   });
 
-  it('passes its position so the deal can be staggered', () => {
-    const { container } = render(<PlayingCard card={card('c1')} index={7} dealReady />);
-    expect(container.querySelector('.card')!.getAttribute('style')).toContain('--card-index: 7');
+  it('never holds back a card that is landing on the table', () => {
+    render(<PlayingCard card={card('c1')} played dealReady={false} />);
+    expect(calls).toHaveLength(1);
   });
 });
 
-describe('the hand deals through the table', () => {
-  function room(): RoomView {
-    return {
-      id: 'r1',
-      code: 'ABCDE',
-      status: 'playing',
-      mode: 'classic4',
-      targetScore: 7,
-      hostPlayerId: 'p0',
-      players: [0, 1, 2, 3].map((seat) => ({
-        id: `p${seat}`,
-        name: `بازیکن ${seat + 1}`,
-        seat,
-        connected: true,
-      })),
-    } as RoomView;
-  }
-
-  function game(hand: string[]) {
-    return {
-      id: 'g1',
-      mode: 'classic4',
-      phase: 'playing',
-      hakemSeat: 0,
-      currentTurnSeat: 0,
-      trumpSuit: 'hearts',
-      currentTrick: { leaderSeat: 0, plays: [] },
-      completedTricks: [],
-      handScore: { tricks: { 0: 0, 1: 0 } },
-      matchScore: { 0: 0, 1: 0 },
-      targetScore: 7,
-      roundNumber: 1,
-      players: [],
-      myHand: hand.map((id) => card(id)),
-      validCardIds: hand,
-    } as any;
-  }
-
-  function renderHand(hand: string[], dealReady: boolean) {
-    return render(
-      <GameTable
-        room={room()}
-        game={game(hand)}
-        meId="p0"
-        chooseSuit={noop}
-        play={noop}
-        nextHand={noop}
-        requestRedeal={noop}
-        discard={noop}
-        draw={noop}
-        resolveDraw={noop}
-        dealReady={dealReady}
-      />,
-    );
-  }
-
-  it('holds the opening deal back while the overlay is up', () => {
-    const { container } = renderHand(['a', 'b', 'c', 'd', 'e'], false);
-    const cards = container.querySelectorAll('.hand .card');
-    expect(cards).toHaveLength(5);
-    expect([...cards].every((el) => !el.classList.contains('is-dealt'))).toBe(true);
+describe('animation is safe and considerate', () => {
+  it('respects the reduced motion setting', () => {
+    window.matchMedia = ((query: string) => ({
+      matches: true,
+      media: query,
+      addEventListener() {},
+      removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+    render(<PlayingCard card={card('c1')} index={0} />);
+    expect(calls).toHaveLength(0);
   });
 
-  it('deals every card once the overlay clears', () => {
-    const { container } = renderHand(['a', 'b', 'c', 'd', 'e'], true);
-    const cards = container.querySelectorAll('.hand .card');
-    expect([...cards].every((el) => el.classList.contains('is-dealt'))).toBe(true);
+  it('does nothing when the browser has no Web Animations support', () => {
+    (Element.prototype as unknown as { animate: unknown }).animate = undefined;
+    expect(() => render(<PlayingCard card={card('c1')} index={0} />)).not.toThrow();
   });
 
-  it('staggers each card by its position in the hand', () => {
-    const { container } = renderHand(['a', 'b', 'c'], true);
-    const indices = [...container.querySelectorAll('.hand .card')].map((el) =>
-      el.getAttribute('style'),
-    );
-    expect(indices[0]).toContain('--card-index: 0');
-    expect(indices[1]).toContain('--card-index: 1');
-    expect(indices[2]).toContain('--card-index: 2');
-  });
-
-  it('animates only the cards added by the second deal', () => {
-    // After trump is named the hand grows from 5 to 13. The original five keep
-    // their nodes, so only the new arrivals mount and animate.
-    const { container, rerender } = renderHand(['a', 'b', 'c', 'd', 'e'], true);
-    const before = [...container.querySelectorAll('.hand .card')];
-    rerender(
-      <GameTable
-        room={room()}
-        game={game(['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'])}
-        meId="p0"
-        chooseSuit={noop}
-        play={noop}
-        nextHand={noop}
-        requestRedeal={noop}
-        discard={noop}
-        draw={noop}
-        resolveDraw={noop}
-        dealReady
-      />,
-    );
-    const after = [...container.querySelectorAll('.hand .card')];
-    expect(after).toHaveLength(8);
-    // The first five are the very same elements, so they do not replay.
-    for (let i = 0; i < 5; i += 1) expect(after[i]).toBe(before[i]);
+  it('cancels the animation when the card is removed', () => {
+    const { unmount } = render(<PlayingCard card={card('c1')} index={0} />);
+    unmount();
+    expect(cancelled).toBe(1);
   });
 });

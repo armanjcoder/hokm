@@ -1,5 +1,6 @@
 import type { Card } from '@hokm/game-engine';
 import { suitMeta } from '../types.js';
+import { useCardEntrance } from '../useCardEntrance.js';
 
 /**
  * A single playing card.
@@ -38,22 +39,23 @@ export function PlayingCard({
 }) {
   const suit = suitMeta(card.suit);
   const label = `${card.rank} ${suit.label}`;
-  const classes = [
-    'card',
-    suit.color,
-    compact && 'compact',
-    selected && 'selected',
-    played ? 'is-played' : dealReady && 'is-dealt',
-    disabled && 'is-blocked',
-  ]
+  // Driven imperatively rather than by a CSS class: a mount-only CSS animation
+  // silently does nothing when React reuses the node.
+  const ref = useCardEntrance({
+    kind: played ? 'land' : 'deal',
+    index,
+    enabled: played || dealReady,
+    replayKey: card.id,
+  });
+  const classes = ['card', suit.color, compact && 'compact', selected && 'selected', disabled && 'is-blocked']
     .filter(Boolean)
     .join(' ');
 
   return (
     <button
+      ref={ref}
       type="button"
       className={classes}
-      style={{ '--card-index': index } as React.CSSProperties}
       disabled={disabled}
       aria-label={compact ? label : `بازی کردن ${label}`}
       aria-pressed={selected}

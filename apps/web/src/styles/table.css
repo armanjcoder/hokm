@@ -411,40 +411,9 @@
   box-shadow: var(--shadow-lg);
 }
 
-/* Dealing: each card in the hand slides up in turn, capped so a 17 card hand
-   in the three player game still finishes quickly. */
-.card.is-dealt {
-  animation: card-deal var(--duration-slow) var(--ease-out) both;
-  animation-delay: calc(min(var(--card-index, 0), 12) * 28ms);
-}
-
-/* Landing: a played card drops onto the table in front of its owner. */
-.card.is-played {
-  animation: card-land var(--duration-base) var(--ease-out) both;
-}
-
-@keyframes card-deal {
-  from {
-    opacity: 0;
-    transform: translateY(26px) scale(0.86) rotate(-4deg);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
-@keyframes card-land {
-  from {
-    opacity: 0;
-    transform: translateY(-18px) scale(1.08);
-  }
-  to {
-    opacity: 1;
-    transform: none;
-  }
-}
-
+/* Card entrance is driven by the Web Animations API in `useCardEntrance`.
+   A CSS mount animation is invisible whenever React reuses the node, which is
+   exactly what happens when a new card lands in a seat that already held one. */
 
 .trump-picker {
   position: absolute;

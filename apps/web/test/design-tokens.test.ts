@@ -281,15 +281,18 @@ describe('card face and animation', () => {
     expect(rule).toMatch(/translate\(-50%,\s*-50%\)/);
   });
 
-  it('staggers the deal but caps the delay so long hands still finish quickly', () => {
-    expect(table).toContain('card-deal');
-    // A 17 card hand must not take 17 * delay to appear.
-    expect(table).toMatch(/min\(var\(--card-index[^)]*\),\s*\d+\)/);
+  it('animates the won trick highlight in CSS', () => {
+    // Seat highlighting is a plain state change, so CSS is the right tool.
+    // Card entrances are not: they live in `useCardEntrance` and are covered by
+    // card-animation.test.tsx, which asserts the animation actually starts.
+    expect(table).toContain('@keyframes seat-won');
   });
 
-  it('animates a played card landing and a won trick', () => {
-    expect(table).toContain('@keyframes card-land');
-    expect(table).toContain('@keyframes seat-won');
+  it('leaves card entrance animation to the Web Animations API', () => {
+    // A CSS mount animation silently does nothing when React reuses the node,
+    // which is how "cards just appear" shipped three times.
+    expect(table).not.toContain('@keyframes card-deal');
+    expect(table).not.toContain('@keyframes card-land');
   });
 
   it('only lifts cards on devices that truly hover', () => {
