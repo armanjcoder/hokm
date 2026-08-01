@@ -433,3 +433,38 @@ describe('cards never disturb the rest of the table', () => {
     expect(rule(table, '.table-center__core')).toMatch(/min-height:\s*\d+px/);
   });
 });
+
+describe('cards sit where the table says they should', () => {
+  const table = read(path.join(stylesDir, 'table.css'));
+
+  function rule(css: string, selector: string): string {
+    const at = css.indexOf(`${selector} {`);
+    expect(at, `${selector} should exist`).toBeGreaterThan(-1);
+    return css.slice(at, css.indexOf('}', at));
+  }
+
+  it('never centres a card with a transform', () => {
+    // The entrance animation writes `transform` on this very element, so a
+    // translate(-50%,-50%) used for centring is wiped out mid-flight and the
+    // card settles half its own size away from its slot.
+    const layer = rule(table, '.table-seat__played > *');
+    expect(layer).not.toMatch(/transform:/);
+    expect(layer).toMatch(/inset:\s*0/);
+    expect(layer).toMatch(/place-items:\s*center/);
+  });
+
+  it('centres stacked draw cards the same way', () => {
+    const stackCard = rule(table, '.draw-stack__card');
+    expect(stackCard).toMatch(/inset:\s*0/);
+  });
+
+  it('sweeps a finished trick towards each possible winner', () => {
+    for (const side of ['top', 'bottom', 'left', 'right']) {
+      expect(table).toContain(`.table-seat__played.is-sweeping.sweep-${side}`);
+    }
+  });
+
+  it('fades the swept cards out as they travel', () => {
+    expect(rule(table, '.table-seat__played.is-sweeping > *')).toMatch(/opacity:\s*0/);
+  });
+});

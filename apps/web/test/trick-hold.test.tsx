@@ -1,7 +1,10 @@
 import { act, cleanup, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PublicGameView } from '@hokm/game-engine';
-import { TRICK_HOLD_MS, useTrickHold } from '../src/useTrickHold.js';
+import { TRICK_HOLD_MS, TRICK_SWEEP_MS, useTrickHold } from '../src/useTrickHold.js';
+
+/** The hold clock starts only after the last card has landed. */
+const LANDING_MS = 900;
 
 afterEach(cleanup);
 beforeEach(() => vi.useFakeTimers());
@@ -39,7 +42,7 @@ describe('useTrickHold', () => {
     const { result } = renderHook(() =>
       useTrickHold(view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>)),
     );
-    expect(result.current.currentTrick.plays).toHaveLength(4);
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
   });
 
   it('carries the winner through so the seat can be highlighted', () => {
@@ -47,7 +50,7 @@ describe('useTrickHold', () => {
     const { result } = renderHook(() =>
       useTrickHold(view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>)),
     );
-    expect(result.current.currentTrick.winnerSeat).toBe(3);
+    expect(result.current.game.currentTrick.winnerSeat).toBe(3);
   });
 
   it('clears the trick once the hold elapses', () => {
@@ -55,11 +58,11 @@ describe('useTrickHold', () => {
     const { result } = renderHook(() =>
       useTrickHold(view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>)),
     );
-    expect(result.current.currentTrick.plays).toHaveLength(4);
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
     act(() => {
-      vi.advanceTimersByTime(TRICK_HOLD_MS + 10);
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + TRICK_SWEEP_MS + 20);
     });
-    expect(result.current.currentTrick.plays).toHaveLength(0);
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
   });
 
   it('holds for about three seconds, long enough to read four cards', () => {
@@ -73,9 +76,9 @@ describe('useTrickHold', () => {
       useTrickHold(view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>)),
     );
     act(() => {
-      vi.advanceTimersByTime(TRICK_HOLD_MS - 200);
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS - 200);
     });
-    expect(result.current.currentTrick.plays).toHaveLength(4);
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
   });
 
   it('drops the hold as soon as the next trick starts', () => {
@@ -89,7 +92,7 @@ describe('useTrickHold', () => {
         },
       },
     );
-    expect(result.current.currentTrick.plays).toHaveLength(4);
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
 
     rerender({
       game: view({
@@ -97,8 +100,8 @@ describe('useTrickHold', () => {
         currentTrick: { leaderSeat: 2, plays: [{ seat: 2, card: card('next') }] },
       } as unknown as Partial<PublicGameView>),
     });
-    expect(result.current.currentTrick.plays).toHaveLength(1);
-    expect(result.current.currentTrick.plays[0]!.card.id).toBe('next');
+    expect(result.current.game.currentTrick.plays).toHaveLength(1);
+    expect(result.current.game.currentTrick.plays[0]!.card.id).toBe('next');
   });
 
   it('holds each new trick in turn', () => {
@@ -113,14 +116,14 @@ describe('useTrickHold', () => {
       },
     );
     act(() => {
-      vi.advanceTimersByTime(TRICK_HOLD_MS + 10);
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + TRICK_SWEEP_MS + 20);
     });
-    expect(result.current.currentTrick.plays).toHaveLength(0);
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
 
     rerender({
       game: view({ completedTricks: [first, second] } as unknown as Partial<PublicGameView>),
     });
-    expect(result.current.currentTrick.plays.map((p: any) => p.card.id)).toEqual([
+    expect(result.current.game.currentTrick.plays.map((p: any) => p.card.id)).toEqual([
       'e',
       'f',
       'g',
@@ -136,10 +139,10 @@ describe('useTrickHold', () => {
       { initialProps: { g: game } },
     );
     act(() => {
-      vi.advanceTimersByTime(TRICK_HOLD_MS + 10);
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + TRICK_SWEEP_MS + 20);
     });
     rerender({ g: { ...game } as PublicGameView });
-    expect(result.current.currentTrick.plays).toHaveLength(0);
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
   });
 
   it('passes a live trick straight through untouched', () => {
@@ -147,7 +150,7 @@ describe('useTrickHold', () => {
       currentTrick: { leaderSeat: 0, plays: [{ seat: 0, card: card('live') }] },
     } as unknown as Partial<PublicGameView>);
     const { result } = renderHook(() => useTrickHold(game));
-    expect(result.current).toBe(game);
+    expect(result.current.game).toBe(game);
   });
 
   it('ignores a trick with no recorded winner', () => {
@@ -155,6 +158,74 @@ describe('useTrickHold', () => {
       completedTricks: [{ leaderSeat: 0, plays: [{ seat: 0, card: card('x') }] }],
     } as unknown as Partial<PublicGameView>);
     const { result } = renderHook(() => useTrickHold(game));
-    expect(result.current.currentTrick.plays).toHaveLength(0);
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
+  });
+});
+
+describe('the finished trick is collected by its winner', () => {
+  const trick = finishedTrick(['a', 'b', 'c', 'd'], 3);
+  const held = () => view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>);
+
+  it('does not sweep while players are still reading the cards', () => {
+    const { result } = renderHook(() => useTrickHold(held()));
+    act(() => {
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS - 200);
+    });
+    expect(result.current.sweepingTo).toBeUndefined();
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
+  });
+
+  it('sweeps towards the winning seat once the hold is over', () => {
+    const { result } = renderHook(() => useTrickHold(held()));
+    act(() => {
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + 20);
+    });
+    expect(result.current.sweepingTo).toBe(3);
+    // The cards are still on screen while they travel.
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
+  });
+
+  it('clears the cards only after they have finished travelling', () => {
+    const { result } = renderHook(() => useTrickHold(held()));
+    act(() => {
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + 20);
+    });
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
+    act(() => {
+      vi.advanceTimersByTime(TRICK_SWEEP_MS + 20);
+    });
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
+    expect(result.current.sweepingTo).toBeUndefined();
+  });
+
+  it('gives players at least two and a half seconds to read the cards', () => {
+    expect(TRICK_HOLD_MS).toBeGreaterThanOrEqual(2500);
+  });
+
+  it('measures the reading time from after the last card lands', () => {
+    // Otherwise most of the hold is spent watching the fourth card fly in.
+    const { result } = renderHook(() => useTrickHold(held()));
+    act(() => {
+      vi.advanceTimersByTime(2500);
+    });
+    expect(result.current.sweepingTo).toBeUndefined();
+  });
+
+  it('abandons the sweep if the next trick starts first', () => {
+    const { result, rerender } = renderHook(
+      ({ g }: { g: PublicGameView }) => useTrickHold(g),
+      { initialProps: { g: held() } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + 20);
+    });
+    expect(result.current.sweepingTo).toBe(3);
+    rerender({
+      g: view({
+        completedTricks: [trick],
+        currentTrick: { leaderSeat: 3, plays: [{ seat: 3, card: card('next') }] },
+      } as unknown as Partial<PublicGameView>),
+    });
+    expect(result.current.sweepingTo).toBeUndefined();
   });
 });

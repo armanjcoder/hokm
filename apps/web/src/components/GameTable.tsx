@@ -43,7 +43,7 @@ export function GameTable({
 }: GameTableProps) {
   // A completed trick is held on screen for a few seconds so everyone can see
   // what was played; the rest of the component treats this as the live view.
-  const game = useTrickHold(liveGame);
+  const { game, sweepingTo } = useTrickHold(liveGame);
   const me = room.players.find((p) => p.id === meId);
   const hakem = room.players.find((p) => p.seat === game.hakemSeat);
   const isMyTurn = me?.seat === game.currentTurnSeat;
@@ -70,7 +70,10 @@ export function GameTable({
   }
 
   const discarding = game.phase === 'discarding' && !iHaveDiscarded;
-  const hakemDraw = useHakemDraw(game, hakemDrawDone ? { onFinished: hakemDrawDone } : {});
+  const hakemDraw = useHakemDraw(game, {
+    enabled: dealReady,
+    ...(hakemDrawDone ? { onFinished: hakemDrawDone } : {}),
+  });
   const seats = buildSeatViews({
     mode: game.mode,
     players: room.players,
@@ -78,6 +81,8 @@ export function GameTable({
     mySeat: me?.seat,
     drawRevealed: hakemDraw.revealed.map((entry) => ({ seat: entry.seat, card: entry.card })),
   });
+  // While the trick is being collected, every card leans towards the winner.
+  const sweepTarget = sweepingTo === undefined ? undefined : seats.find((s) => s.seat === sweepingTo);
   const rosters = teamRosters(seats);
   // Cards are released one at a time so the deal can be watched.
   const dealtCount = useDealSequence(game, me?.seat);
@@ -164,7 +169,12 @@ export function GameTable({
 
       <div className={`table-center seats-${config.seats}`}>
         {seats.map((view) => (
-          <TableSeat key={view.seat} view={view} teamPlay={config.teamPlay} />
+          <TableSeat
+            key={view.seat}
+            view={view}
+            teamPlay={config.teamPlay}
+            {...(sweepTarget ? { sweepTo: sweepTarget.position } : {})}
+          />
         ))}
         <div className="table-center__core">
           <div className="turn-badge" role="status" aria-live="polite">

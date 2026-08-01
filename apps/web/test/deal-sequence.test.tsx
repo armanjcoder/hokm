@@ -235,3 +235,50 @@ describe('useHakemDraw', () => {
     expect(onFinished).toHaveBeenCalledOnce();
   });
 });
+
+describe('the hakem draw waits for the start overlay', () => {
+  const drawCards = [
+    { seat: 0, card: card('c0'), isAce: false },
+    { seat: 1, card: card('c1'), isAce: true },
+  ];
+  const drawing = () =>
+    view({ phase: 'choosing_hakem', hakemDraw: drawCards } as unknown as Partial<PublicGameView>);
+
+  it('reveals nothing while the overlay still covers the table', () => {
+    // Otherwise the whole draw plays out behind the blur and the players only
+    // ever see its aftermath.
+    const { result } = renderHook(() => useHakemDraw(drawing(), { enabled: false }));
+    act(() => {
+      vi.advanceTimersByTime(DRAW_STEP_MS * 5);
+    });
+    expect(result.current.revealed).toHaveLength(0);
+    expect(result.current.running).toBe(false);
+  });
+
+  it('never reports finished while it is held back', () => {
+    const onFinished = vi.fn();
+    renderHook(() => useHakemDraw(drawing(), { enabled: false, onFinished }));
+    act(() => {
+      vi.advanceTimersByTime(DRAW_STEP_MS * 5 + DRAW_SETTLE_MS);
+    });
+    expect(onFinished).not.toHaveBeenCalled();
+  });
+
+  it('starts from the beginning once the overlay clears', () => {
+    const { result, rerender } = renderHook(
+      ({ on }: { on: boolean }) => useHakemDraw(drawing(), { enabled: on }),
+      { initialProps: { on: false } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(DRAW_STEP_MS * 3);
+    });
+    expect(result.current.revealed).toHaveLength(0);
+
+    rerender({ on: true });
+    expect(result.current.revealed).toHaveLength(0);
+    act(() => {
+      vi.advanceTimersByTime(DRAW_STEP_MS + 10);
+    });
+    expect(result.current.revealed).toHaveLength(1);
+  });
+});

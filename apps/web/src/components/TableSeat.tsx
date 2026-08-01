@@ -1,4 +1,4 @@
-import { seatInitials, seatLabel, type SeatView } from '../table-seats.js';
+import { seatInitials, seatLabel, type SeatView, type TablePosition } from '../table-seats.js';
 import { PlayingCard } from './PlayingCard.js';
 
 /**
@@ -8,7 +8,16 @@ import { PlayingCard } from './PlayingCard.js';
  * the card they just played. Everything a player needs to follow the round
  * without guessing which anonymous seat number belongs to whom.
  */
-export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolean }) {
+export function TableSeat({
+  view,
+  teamPlay,
+  /** Set while the finished trick is sweeping towards the winning seat. */
+  sweepTo,
+}: {
+  view: SeatView;
+  teamPlay: boolean;
+  sweepTo?: TablePosition;
+}) {
   const label = seatLabel(view);
   const empty = !view.player;
 
@@ -64,7 +73,7 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
         </span>
       </div>
 
-      <div className="table-seat__played">
+      <div className={`table-seat__played ${sweepTo ? `is-sweeping sweep-${sweepTo}` : ''}`}>
         {(view.drawCards?.length ?? 0) > 0 ? (
           // The hakem draw can go round more than once, so each new card is
           // stacked slightly over the last rather than replacing it.

@@ -292,12 +292,15 @@
   overflow: visible;
 }
 
-/* Everything inside the stage is absolutely positioned: zero layout impact. */
+/* Everything inside the stage is absolutely positioned: zero layout impact.
+   Centring is done with `inset` and grid placement rather than a transform,
+   because the card entrance animates `transform` on this very element and any
+   centring offset there would be wiped out mid-flight. */
 .table-seat__played > * {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  display: grid;
+  place-items: center;
 }
 
 .table-seat__empty-slot {
@@ -683,6 +686,8 @@
 .draw-stack__card {
   position: absolute;
   inset: 0;
+  display: grid;
+  place-items: center;
   /* Each extra card sits slightly down and across, so the depth of the stack
      is legible at a glance. */
   /* Each extra card sits slightly down and across, so the depth of the stack is
@@ -692,4 +697,38 @@
     calc(var(--stack-depth, 0) * 5px)
   );
   z-index: calc(var(--stack-depth, 0) + 1);
+}
+
+/* Collecting a finished trick.
+   Once everyone has had time to read the cards, they slide off towards the
+   seat that won them and fade out. Making the cards physically travel to the
+   winner is what tells the table who took the trick, rather than expecting
+   players to notice a highlight. */
+.table-seat__played.is-sweeping > * {
+  transition:
+    transform var(--duration-slow) var(--ease-in-out),
+    opacity var(--duration-slow) var(--ease-in-out);
+  opacity: 0;
+}
+
+.table-seat__played.is-sweeping.sweep-top > * {
+  transform: translateY(-160px) scale(0.7);
+}
+
+.table-seat__played.is-sweeping.sweep-bottom > * {
+  transform: translateY(160px) scale(0.7);
+}
+
+.table-seat__played.is-sweeping.sweep-left > * {
+  transform: translateX(-160px) scale(0.7);
+}
+
+.table-seat__played.is-sweeping.sweep-right > * {
+  transform: translateX(160px) scale(0.7);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .table-seat__played.is-sweeping > * {
+    transform: none;
+  }
 }

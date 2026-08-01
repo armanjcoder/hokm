@@ -29,6 +29,12 @@ export interface HakemDrawState {
 export interface UseHakemDrawOptions {
   /** Called once the whole sequence has been shown. */
   onFinished?: () => void;
+  /**
+   * Held back while something covers the table, such as the start overlay.
+   * Without this the draw plays out behind the blur and the players only ever
+   * see its aftermath.
+   */
+  enabled?: boolean;
   stepMs?: number;
   settleMs?: number;
 }
@@ -41,7 +47,12 @@ function prefersReducedMotion(): boolean {
 
 export function useHakemDraw(
   game: PublicGameView,
-  { onFinished, stepMs = DRAW_STEP_MS, settleMs = DRAW_SETTLE_MS }: UseHakemDrawOptions = {},
+  {
+    onFinished,
+    enabled = true,
+    stepMs = DRAW_STEP_MS,
+    settleMs = DRAW_SETTLE_MS,
+  }: UseHakemDrawOptions = {},
 ): HakemDrawState {
   const cards = game.phase === 'choosing_hakem' ? (game.hakemDraw ?? []) : [];
   const total = cards.length;
@@ -54,6 +65,11 @@ export function useHakemDraw(
   const reportedRef = useRef(false);
 
   useEffect(() => {
+    // Nothing is revealed until the table is actually visible.
+    if (!enabled) {
+      setShown(0);
+      return;
+    }
     if (total === 0) {
       setShown(0);
       reportedRef.current = false;
@@ -90,14 +106,14 @@ export function useHakemDraw(
     return () => timers.forEach(clearTimeout);
     // The sequence is identified by its length and last card, which is stable
     // for a given draw and changes only when a new draw arrives.
-  }, [total, cards[total - 1]?.card.id, stepMs, settleMs]);
+  }, [total, cards[total - 1]?.card.id, stepMs, settleMs, enabled]);
 
   const revealed = cards.slice(0, shown);
   const ace = revealed.find((entry) => entry.isAce);
 
   return {
     revealed,
-    running: total > 0,
+    running: enabled && total > 0,
     hakemSeat: ace?.seat,
   };
 }
