@@ -23,6 +23,8 @@ export interface GameActions {
   draw: () => void;
   /** Two player mode: keep or burn the revealed card. */
   resolveDraw: (keep: boolean) => void;
+  /** Reports that this client finished showing the hakem draw. */
+  hakemDrawDone: () => void;
   /** Blocks actions that would be silently dropped while the socket is down. */
   requireConnection: () => boolean;
 }
@@ -51,6 +53,12 @@ export function useGameActions({ socket, session, game, connection, setToast }: 
       if (!session || !game?.validCardIds.includes(card.id)) return;
       if (!requireConnection()) return;
       socket.emit('game:play_card', { ...socketPayload(session), cardId: card.id }, ackToast);
+    },
+    hakemDrawDone() {
+      // Fire and forget: the server ignores repeats, and a dropped frame here
+      // must never block the hand from starting.
+      if (!session) return;
+      socket.emit('game:hakem_draw_done', socketPayload(session));
     },
     nextHand() {
       if (!session || !requireConnection()) return;

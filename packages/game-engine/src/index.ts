@@ -8,3 +8,4 @@ export * from './public-view.js';
 export * from './duel.js';
 export * from './redeal.js';
 export * from './trick.js';
+export * from './hakem-draw.js';

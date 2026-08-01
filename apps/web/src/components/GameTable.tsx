@@ -7,6 +7,9 @@ import { Score } from './Score.js';
 import { TableSeat } from './TableSeat.js';
 import { buildSeatViews, teamRosters, turnMessage } from '../table-seats.js';
 import { useTrickHold } from '../useTrickHold.js';
+import { useHakemDraw } from '../useHakemDraw.js';
+import { useDealSequence } from '../useDealSequence.js';
+import { HakemDrawOverlay } from './HakemDrawOverlay.js';
 
 export interface GameTableProps {
   room: RoomView;
@@ -21,6 +24,8 @@ export interface GameTableProps {
   resolveDraw: (keep: boolean) => void;
   /** False while the start overlay is covering the table. */
   dealReady?: boolean;
+  /** Tells the server this client finished showing the hakem draw. */
+  hakemDrawDone?: () => void;
 }
 
 export function GameTable({
@@ -35,6 +40,7 @@ export function GameTable({
   draw,
   resolveDraw,
   dealReady = true,
+  hakemDrawDone,
 }: GameTableProps) {
   // A completed trick is held on screen for a few seconds so everyone can see
   // what was played; the rest of the component treats this as the live view.
@@ -67,6 +73,9 @@ export function GameTable({
   const discarding = game.phase === 'discarding' && !iHaveDiscarded;
   const seats = buildSeatViews({ mode: game.mode, players: room.players, game, mySeat: me?.seat });
   const rosters = teamRosters(seats);
+  const hakemDraw = useHakemDraw(game, hakemDrawDone ? { onFinished: hakemDrawDone } : {});
+  // Cards are released one at a time so the deal can be watched.
+  const dealtCount = useDealSequence(game, me?.seat);
   // Scores are keyed by absolute team index, but the strip is labelled from the
   // viewer's side so "our team" always sits on the same side of the screen.
   const myTeam = config.teamPlay ? (me?.seat ?? 0) % 2 : (me?.seat ?? 0);
@@ -148,6 +157,14 @@ export function GameTable({
         resolveDraw={resolveDraw}
       />
 
+      {hakemDraw.running && (
+        <HakemDrawOverlay
+          revealed={hakemDraw.revealed}
+          seats={seats}
+          hakemSeat={hakemDraw.hakemSeat}
+        />
+      )}
+
       <div className={`table-center seats-${config.seats}`}>
         {seats.map((view) => (
           <TableSeat key={view.seat} view={view} teamPlay={config.teamPlay} />
@@ -176,7 +193,7 @@ export function GameTable({
       )}
 
       <div className="hand">
-        {game.myHand.map((card, index) =>
+        {game.myHand.slice(0, dealtCount).map((card, index) =>
           discarding ? (
             <PlayingCard
               key={card.id}

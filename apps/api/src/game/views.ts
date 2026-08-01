@@ -39,6 +39,8 @@ export function sanitizeRoom(room: Room) {
           rules: room.game.rules,
           redealCount: room.game.redealCount,
           stockCount: room.game.stock?.length ?? 0,
+          // Public by design: the hakem draw is meant to be watched by everyone.
+          hakemDraw: room.game.hakemDraw,
           lastEvent: room.game.lastEvent,
         }
       : undefined,

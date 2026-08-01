@@ -1,5 +1,6 @@
 import { createDeck, HokmError, shuffle, SUITS, localizeSuit } from './cards.js';
 import { evaluateTrickWinner } from './trick.js';
+import { drawForHakem } from './hakem-draw.js';
 import { getValidCards } from './legal-moves.js';
 import {
   getModeConfig,
@@ -69,17 +70,53 @@ export function createGame(
   }
 
   const matchScore = Object.fromEntries(teamsOf(config).map((team) => [team, 0]));
-  return startNewHand({
+
+  // The first hakem can be decided by turning cards until an ace shows, which is
+  // both fair and something the players can watch happen. Callers that pin
+  // `hakemSeat` want a deterministic hand and skip the draw entirely.
+  const draw =
+    options.drawHakem && options.hakemSeat === undefined
+      ? drawForHakem(mode, options.rng)
+      : undefined;
+  const hakemSeat = draw?.hakemSeat ?? options.hakemSeat ?? 0;
+
+  const hand = startNewHand({
     id: options.id ?? cryptoSafeId(),
     mode,
     players,
-    hakemSeat: options.hakemSeat ?? 0,
+    hakemSeat,
     matchScore,
     targetScore: options.targetScore ?? 7,
     roundNumber: 1,
     rules: { ...DEFAULT_RULES, ...options.rules },
     rng: options.rng,
   });
+
+  if (!draw) return hand;
+  // The deal already happened; the client walks the draw first and only then
+  // reveals the hand, so the state carries both.
+  return {
+    ...hand,
+    phase: 'choosing_hakem',
+    hakemDraw: draw.cards,
+    lastEvent: 'کارت می‌آید تا حاکم مشخص شود…',
+  };
+}
+
+/**
+ * Ends the hakem draw and moves on to naming trump.
+ *
+ * The client calls this once it has finished replaying the turned cards, so the
+ * animation is never cut short by the next phase arriving too early.
+ */
+export function finishHakemDraw(state: HokmGameState): HokmGameState {
+  if (state.phase !== 'choosing_hakem') return state;
+  const { hakemDraw, ...rest } = state;
+  return {
+    ...rest,
+    phase: 'waiting_for_trump',
+    lastEvent: `راند ${state.roundNumber} شروع شد. حاکم باید حکم کند.`,
+  };
 }
 
 export function chooseTrump(

@@ -87,6 +87,7 @@ function renderScreen(over: { room?: RoomView; game?: any; leaveRoom?: () => voi
         discard: noop,
         draw: noop,
         resolveDraw: noop,
+        hakemDrawDone: noop,
       }}
       invite={noop}
     />,

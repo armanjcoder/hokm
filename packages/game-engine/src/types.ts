@@ -12,6 +12,8 @@ export type Seat = 0 | 1 | 2 | 3;
 export type GameMode = 'classic4' | 'solo3' | 'duel2';
 
 export type GamePhase =
+  /** Cards are turned one by one until an ace appears, naming the hakem. */
+  | 'choosing_hakem'
   | 'waiting_for_trump'
   /** Two player only: both sides discard before the draw begins. */
   | 'discarding'
@@ -20,6 +22,14 @@ export type GamePhase =
   | 'playing'
   | 'hand_complete'
   | 'game_complete';
+
+/** One card turned during the hakem draw. */
+export interface HakemDrawCard {
+  seat: Seat;
+  card: Card;
+  /** True for the ace that ended the draw. */
+  isAce: boolean;
+}
 
 export interface Card {
   id: string;
@@ -77,6 +87,13 @@ export interface HokmGameState {
   canRequestRedeal: boolean;
   /** Cards removed so the deck divides evenly (three player mode). */
   removedCards?: Card[];
+  /**
+   * Cards turned during the hakem draw, in the order they were dealt.
+   *
+   * Kept on the state so every client replays the same sequence, and so a
+   * player who reconnects mid-draw still sees how the hakem was decided.
+   */
+  hakemDraw?: HakemDrawCard[];
   /** Two player only: face-down stock drawn from during the draw phase. */
   stock?: Card[];
   /** Two player only: seats that have finished discarding. */
@@ -111,6 +128,13 @@ export interface CreateGameOptions {
   hakemSeat?: Seat;
   rules?: Partial<OptionalRules>;
   rng?: () => number;
+  /**
+   * Decide the first hakem by turning cards until an ace appears, and start in
+   * the `choosing_hakem` phase so the client can show it happening.
+   *
+   * Off by default: callers that pin `hakemSeat` want a deterministic hand.
+   */
+  drawHakem?: boolean;
 }
 
 export interface PublicPlayerView extends Player {

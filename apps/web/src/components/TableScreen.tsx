@@ -30,6 +30,7 @@ interface TableHandlers {
   discard: (cardIds: string[]) => void;
   draw: () => void;
   resolveDraw: (keep: boolean) => void;
+  hakemDrawDone: () => void;
 }
 
 /** Everything shown once the player is seated at a table. */

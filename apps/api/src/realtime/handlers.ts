@@ -2,6 +2,7 @@ import type { Server, Socket } from 'socket.io';
 import {
   chooseTrump,
   continueToNextHand,
+  finishHakemDraw,
   discardCards,
   drawCard,
   playCard,
@@ -10,11 +11,17 @@ import {
 } from '@hokm/game-engine';
 import { normalizeError } from '../errors.js';
 import { autoAdvanceBots } from '../game/bots.js';
-import { requireActiveGame, requireSession } from '../game/room-service.js';
+import {
+  clearHakemDrawTimeout,
+  requireActiveGame,
+  requireSession,
+  setHakemDrawTimeoutHandler,
+} from '../game/room-service.js';
 import { viewFor } from '../game/views.js';
 import {
   chooseTrumpSchema,
   discardSchema,
+  hakemDrawDoneSchema,
   drawSchema,
   nextHandSchema,
   playCardSchema,
@@ -28,10 +35,23 @@ import { emitRoom, hasOtherSocketForPlayer } from './broadcast.js';
 type Ack = ((response: unknown) => void) | undefined;
 
 export function registerSocketHandlers(io: Server): void {
+  // A table whose clients never report back must still start its hand.
+  setHakemDrawTimeoutHandler((room) => {
+    if (room.game?.phase !== 'choosing_hakem') return;
+    room.game = finishHakemDraw(room.game);
+    autoAdvanceBots(room);
+    touchRoom(room);
+    persistRoom(room);
+    void emitRoom(room);
+  });
+
   io.on('connection', (socket) => {
     socket.on('room:join', (payload: unknown, ack: Ack) => handleJoin(socket, payload, ack));
     socket.on('game:choose_trump', (payload: unknown, ack: Ack) => handleChooseTrump(payload, ack));
     socket.on('game:play_card', (payload: unknown, ack: Ack) => handlePlayCard(payload, ack));
+    socket.on('game:hakem_draw_done', (payload: unknown, ack: Ack) =>
+      handleHakemDrawDone(payload, ack),
+    );
     socket.on('game:next_hand', (payload: unknown, ack: Ack) => handleNextHand(payload, ack));
     socket.on('game:redeal', (payload: unknown, ack: Ack) => handleRedeal(payload, ack));
     socket.on('game:discard', (payload: unknown, ack: Ack) => handleDiscard(payload, ack));
@@ -93,6 +113,36 @@ function handlePlayCard(payload: unknown, ack: Ack): void {
     room.game = playCard(game, playerId, cardId);
     autoAdvanceBots(room);
     if (room.game.phase === 'game_complete') room.status = 'finished';
+    touchRoom(room);
+    persistRoom(room);
+
+    ack?.({ ok: true });
+    void emitRoom(room);
+  } catch (error) {
+    ack?.(normalizeError(error));
+  }
+}
+
+/**
+ * Ends the hakem draw once a client has finished showing it.
+ *
+ * Idempotent on purpose: every player reports in when their animation ends, and
+ * `finishHakemDraw` simply returns the state unchanged after the first one.
+ */
+function handleHakemDrawDone(payload: unknown, ack: Ack): void {
+  try {
+    const { roomId, playerId, token } = hakemDrawDoneSchema.parse(payload);
+    const room = requireRoom(roomId);
+    requireSession(room, playerId, token);
+    const game = requireActiveGame(room);
+    if (game.phase !== 'choosing_hakem') {
+      ack?.({ ok: true });
+      return;
+    }
+
+    clearHakemDrawTimeout(room.id);
+    room.game = finishHakemDraw(game);
+    autoAdvanceBots(room);
     touchRoom(room);
     persistRoom(room);
 

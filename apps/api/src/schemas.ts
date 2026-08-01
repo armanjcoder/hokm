@@ -77,6 +77,7 @@ export const socketJoinSchema = socketActor;
 export const chooseTrumpSchema = socketActor.extend({ suit: suitSchema });
 export const playCardSchema = socketActor.extend({ cardId: z.string().min(1) });
 export const nextHandSchema = socketActor;
+export const hakemDrawDoneSchema = socketActor;
 export const redealSchema = socketActor;
 export const discardSchema = socketActor.extend({
   cardIds: z.array(z.string().min(1)).min(1).max(5),

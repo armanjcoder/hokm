@@ -127,16 +127,84 @@ export function leaveRoom(room: Room, playerId: string): void {
   touchRoom(room);
 }
 
+/**
+ * Longest the table will sit in the hakem draw before the server ends it.
+ *
+ * Normally the first client to finish its animation reports in. This is the
+ * backstop for the cases that would otherwise freeze the table forever: every
+ * human closing the app mid-draw, an old client that does not know the event,
+ * or a dropped message.
+ */
+export const HAKEM_DRAW_TIMEOUT_MS = Number(
+  process.env.HOKM_HAKEM_DRAW_TIMEOUT_MS ?? 20_000,
+);
+
+/** Timers currently waiting to force a stuck hakem draw to finish. */
+const drawTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+/**
+ * What to do when a draw times out. Registered by the composition root so this
+ * module needs no socket or storage imports, which would create a cycle.
+ */
+let onDrawTimeout: ((room: Room) => void) | undefined;
+
+export function setHakemDrawTimeoutHandler(handler: (room: Room) => void): void {
+  onDrawTimeout = handler;
+}
+
+/** Cancels a pending draw timeout, e.g. once a client reported in. */
+export function clearHakemDrawTimeout(roomId: string): void {
+  const timer = drawTimers.get(roomId);
+  if (!timer) return;
+  clearTimeout(timer);
+  drawTimers.delete(roomId);
+}
+
+/**
+ * Guarantees the draw ends even if no client ever reports back.
+ *
+ * `onExpire` is injected so this module stays free of socket and storage
+ * imports, which would otherwise make a cycle.
+ */
+export function scheduleHakemDrawTimeout(
+  roomId: string,
+  onExpire: () => void,
+  delayMs: number = HAKEM_DRAW_TIMEOUT_MS,
+): void {
+  clearHakemDrawTimeout(roomId);
+  const timer = setTimeout(() => {
+    drawTimers.delete(roomId);
+    onExpire();
+  }, delayMs);
+  // Never hold the process open just for an animation backstop.
+  timer.unref?.();
+  drawTimers.set(roomId, timer);
+}
+
 /** Starts the game when the table is full and every human pressed ready. */
 export function maybeStartGame(room: Room): boolean {
   if (!evaluateReadiness(room).canStart) return false;
   room.game = createGame(
     room.players.map((p) => ({ id: p.id, name: p.name, seat: p.seat })),
-    { id: room.id, mode: room.mode, targetScore: room.targetScore, rules: room.rules },
+    {
+      id: room.id,
+      mode: room.mode,
+      targetScore: room.targetScore,
+      rules: room.rules,
+      // Real tables pick the hakem by turning cards until an ace shows.
+      drawHakem: true,
+    },
   );
   room.status = 'playing';
   autoAdvanceBots(room);
   touchRoom(room);
+
+  // Clients end the draw when their animation finishes; this is the backstop
+  // for the ones that never do.
+  if (room.game?.phase === 'choosing_hakem' && onDrawTimeout) {
+    const handler = onDrawTimeout;
+    scheduleHakemDrawTimeout(room.id, () => handler(room));
+  }
   return true;
 }
 

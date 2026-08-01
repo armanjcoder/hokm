@@ -168,7 +168,10 @@ describe('a full game can be played to completion', () => {
         continue;
       }
 
-      if (g.phase === 'hand_complete') {
+      if (g.phase === 'choosing_hakem') {
+        // A real client reports in once it has finished showing the draw.
+        await emit('game:hakem_draw_done', {});
+      } else if (g.phase === 'hand_complete') {
         await emit('game:next_hand', {});
       } else if (g.phase === 'waiting_for_trump' && g.hakemSeat === 0) {
         await emit('game:choose_trump', { suit: 'hearts' });
@@ -322,5 +325,50 @@ describe('health exposes the built bundle name', () => {
     expect(body.ok).toBe(true);
     expect('bundle' in body).toBe(true);
     if (body.bundle !== null) expect(body.bundle).toMatch(/\.css$/);
+  });
+});
+
+describe('the hakem draw cannot freeze a table', () => {
+  it('starts the hand even when no client ever reports the draw finished', async () => {
+    // An old client, a closed app or a dropped message must not strand the
+    // table in `choosing_hakem` forever.
+    const server = await ServerHarness.create({ HOKM_HAKEM_DRAW_TIMEOUT_MS: '300' });
+    await server.start();
+    try {
+      const created = await (
+        await fetch(`${server.url}/rooms`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ hostName: 'آرمان' }),
+        })
+      ).json();
+
+      const session = {
+        roomId: created.id as string,
+        playerId: created.players[0].id as string,
+        token: created.token as string,
+      };
+      const call = (path: string, extra: object = {}) =>
+        fetch(`${server.url}/rooms/${session.roomId}/${path}`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ ...session, ...extra }),
+        });
+
+      for (let i = 0; i < 3; i += 1) await call('add-bot');
+      const started = await (await call('ready', { ready: true })).json();
+      expect(started.game.phase).toBe('choosing_hakem');
+
+      // Deliberately never emit `game:hakem_draw_done`.
+      await waitFor(async () => {
+        const room = await (await fetch(`${server.url}/rooms/${session.roomId}`)).json();
+        return room.game?.phase !== 'choosing_hakem';
+      }, { timeoutMs: 5000 });
+
+      const room = await (await fetch(`${server.url}/rooms/${session.roomId}`)).json();
+      expect(room.game.phase).not.toBe('choosing_hakem');
+    } finally {
+      await server.stop();
+    }
   });
 });

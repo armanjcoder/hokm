@@ -155,7 +155,8 @@ export function App() {
     }
   }
 
-  const { chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw, requireConnection } = useGameActions({
+  const { chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw, hakemDrawDone, requireConnection } =
+    useGameActions({
     socket,
     session,
     game,
@@ -230,7 +231,7 @@ export function App() {
       showRules={() => setRulesFor(room.mode ?? 'classic4')}
       onNewTable={() => forgetSession('میز قبلی رها شده بود. حالا می‌تونی میز جدید بسازی.')}
       lobby={{ toggleReady, addBot, setBotDifficulty, removeBot, leaveRoom, updateSettings }}
-      table={{ chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw }}
+      table={{ chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw, hakemDrawDone }}
       invite={() => {
         void shareRoom(room.id, apiUrl).then((outcome) => {
           if (outcome === 'copied') setToast('لینک دعوت کپی شد؛ برای دوستانت بفرست.');

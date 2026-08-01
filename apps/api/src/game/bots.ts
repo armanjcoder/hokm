@@ -1,4 +1,5 @@
 import {
+  finishHakemDraw,
   chooseTrump,
   discardCards,
   requestRedeal,
@@ -62,6 +63,15 @@ export function autoAdvanceBots(room: Room): void {
       return;
     }
     if (room.game.phase === 'hand_complete') return;
+
+    // The hakem draw is ended by whichever client finishes showing it. A table
+    // with no humans left to report in would otherwise sit in this phase
+    // forever, so the server closes it out itself.
+    if (room.game.phase === 'choosing_hakem') {
+      if (room.players.some((player) => !player.isBot)) return;
+      room.game = finishHakemDraw(room.game);
+      continue;
+    }
 
     // During discarding every seat acts, not just the one whose turn it is.
     const bot =
