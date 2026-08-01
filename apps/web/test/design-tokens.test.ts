@@ -256,9 +256,29 @@ describe('the seat ring is responsive and token driven', () => {
 describe('card face and animation', () => {
   const table = read(path.join(stylesDir, 'table.css'));
 
-  it('repeats the index in the opposite corner so overlapped cards stay readable', () => {
-    expect(table).toContain('.card__index--flipped');
-    expect(table).toMatch(/\.card__index--flipped\s*\{[^}]*rotate\(180deg\)/);
+  it('pins the index into the top corner, as real cards do', () => {
+    // The standard layout puts the rank-and-suit index tight in the corner, not
+    // centred: that corner is the only part visible in a fanned hand.
+    const rule = table.slice(table.indexOf('.card__index {'), table.indexOf('.card__index--flipped'));
+    expect(rule).toMatch(/position:\s*absolute/);
+    expect(rule).toMatch(/top:\s*\d/);
+    expect(rule).toMatch(/left:\s*\d/);
+  });
+
+  it('repeats the index rotated in the opposite corner', () => {
+    const rule = table.slice(table.indexOf('.card__index--flipped'));
+    expect(rule).toMatch(/rotate\(180deg\)/);
+    expect(rule).toMatch(/bottom:\s*\d/);
+    expect(rule).toMatch(/right:\s*\d/);
+    // The inherited top/left must be released or the corner offsets fight.
+    expect(rule).toMatch(/top:\s*auto/);
+    expect(rule).toMatch(/left:\s*auto/);
+  });
+
+  it('centres the large pip independently of the corner indices', () => {
+    const rule = table.slice(table.indexOf('.card__pip {'));
+    expect(rule).toMatch(/position:\s*absolute/);
+    expect(rule).toMatch(/translate\(-50%,\s*-50%\)/);
   });
 
   it('staggers the deal but caps the delay so long hands still finish quickly', () => {

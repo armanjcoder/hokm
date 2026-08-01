@@ -1,6 +1,6 @@
 import cors from 'cors';
 import express, { type Express } from 'express';
-import { existsSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { config } from '../config.js';
 import { corsOriginHandler, errorHandler } from './middleware.js';
@@ -15,7 +15,15 @@ export function createApp(): Express {
   app.set('trust proxy', true);
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, service: 'hokm-api', now: new Date().toISOString() });
+    // `bundle` names the CSS file currently on disk. Comparing it against the
+    // asset the browser loaded is the quickest way to tell a stale build from a
+    // real bug, because `dist/` is gitignored and a pull alone never updates it.
+    res.json({
+      ok: true,
+      service: 'hokm-api',
+      now: new Date().toISOString(),
+      bundle: currentBundleName(),
+    });
   });
 
   app.use(roomsRouter);
@@ -25,6 +33,16 @@ export function createApp(): Express {
   // Must be registered last so it can catch everything above.
   app.use(errorHandler);
   return app;
+}
+
+/** Name of the built stylesheet, or null when the app has not been built. */
+function currentBundleName(): string | null {
+  try {
+    const assets = path.join(config.webDistPath, 'assets');
+    return readdirSync(assets).find((file) => file.endsWith('.css')) ?? null;
+  } catch {
+    return null;
+  }
 }
 
 /** Serves the built Mini App from the same origin, which keeps CORS simple. */

@@ -301,6 +301,11 @@
 
 /* A card face modelled on a real one: corner index, centre pip, and the index
    repeated rotated so an overlapped card is still readable from its corner. */
+/* A card face laid out to the traditional standard: the index (rank over suit)
+   sits tight in the top-left corner and is repeated rotated 180 degrees in the
+   bottom-right, with a large pip in the middle. The corner index is what makes
+   a fanned hand readable, so it is absolutely positioned rather than sharing
+   space in a flow layout. */
 .card {
   position: relative;
   direction: ltr;
@@ -311,10 +316,8 @@
   color: var(--card-black);
   box-shadow: var(--shadow-md);
   border: 1px solid rgba(17, 24, 39, 0.12);
-  display: grid;
-  grid-template-rows: auto 1fr auto;
-  padding: var(--space-1) 6px;
-  text-align: left;
+  display: block;
+  padding: 0;
   overflow: hidden;
   transition:
     transform var(--duration-fast) var(--ease-out),
@@ -323,12 +326,22 @@
 }
 
 .card__index {
+  position: absolute;
+  top: 4px;
+  left: 5px;
   display: grid;
   justify-items: center;
+  gap: 1px;
   line-height: 1;
 }
 
+/* The mirrored index: same corner offsets, opposite corner, turned upside down
+   about its own origin so it reads correctly when the card is rotated. */
 .card__index--flipped {
+  top: auto;
+  left: auto;
+  bottom: 4px;
+  right: 5px;
   transform: rotate(180deg);
 }
 
@@ -344,11 +357,13 @@
 }
 
 .card__pip {
-  display: grid;
-  place-items: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   font-size: var(--text-xl);
   line-height: 1;
-  opacity: 0.92;
+  opacity: 0.9;
 }
 
 .card.red {

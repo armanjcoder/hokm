@@ -311,3 +311,16 @@ describe('no player can see another player\'s cards', () => {
     socket.close();
   }, 60000);
 });
+
+describe('health exposes the built bundle name', () => {
+  it('lets a stale deployment be spotted in one request', async () => {
+    // `dist/` is gitignored, so pulling new code without rebuilding leaves the
+    // old bundle in place. Reporting the filename makes that visible instead of
+    // looking like the change silently failed to apply.
+    const response = await fetch(`${server.url}/health`);
+    const body = (await response.json()) as { ok: boolean; bundle: string | null };
+    expect(body.ok).toBe(true);
+    expect('bundle' in body).toBe(true);
+    if (body.bundle !== null) expect(body.bundle).toMatch(/\.css$/);
+  });
+});
