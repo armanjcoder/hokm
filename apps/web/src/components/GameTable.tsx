@@ -18,9 +18,6 @@ export interface GameTableProps {
   discard: (cardIds: string[]) => void;
   draw: () => void;
   resolveDraw: (keep: boolean) => void;
-  /** Leaving mid-game keeps the seat so the player can come back. */
-  leaveRoom: () => void;
-  leaveBusy?: boolean;
 }
 
 export function GameTable({
@@ -34,8 +31,6 @@ export function GameTable({
   discard,
   draw,
   resolveDraw,
-  leaveRoom,
-  leaveBusy = false,
 }: GameTableProps) {
   const me = room.players.find((p) => p.id === meId);
   const hakem = room.players.find((p) => p.seat === game.hakemSeat);
@@ -43,7 +38,6 @@ export function GameTable({
   const isHakem = me?.seat === game.hakemSeat;
   const config = getModeConfig(game.mode);
   const [selected, setSelected] = useState<string[]>([]);
-  const [confirmingLeave, setConfirmingLeave] = useState(false);
 
   const iHaveDiscarded = me ? (game.discardedSeats ?? []).some((seat) => seat === me.seat) : false;
   const pendingDraw = game.pendingDraw;
@@ -159,11 +153,12 @@ export function GameTable({
       )}
 
       <div className="hand">
-        {game.myHand.map((card) =>
+        {game.myHand.map((card, index) =>
           discarding ? (
             <PlayingCard
               key={card.id}
               card={card}
+              index={index}
               selected={selected.includes(card.id)}
               onClick={() => toggleSelected(card.id)}
             />
@@ -171,6 +166,7 @@ export function GameTable({
             <PlayingCard
               key={card.id}
               card={card}
+              index={index}
               disabled={!game.validCardIds.includes(card.id)}
               onClick={() => play(card)}
             />
@@ -178,36 +174,6 @@ export function GameTable({
         )}
       </div>
 
-      <div className="table-footer">
-        {confirmingLeave ? (
-          // Leaving a live game is disruptive for everyone else, so it takes a
-          // deliberate second tap rather than one stray press near the hand.
-          <div className="leave-confirm" role="group" aria-label="تأیید خروج از میز">
-            <p>وسط بازی بیرون بری، صندلی‌ات نگه داشته می‌شود و می‌توانی برگردی.</p>
-            <div className="leave-confirm__actions">
-              <button
-                className="ghost danger"
-                type="button"
-                disabled={leaveBusy}
-                onClick={leaveRoom}
-              >
-                {leaveBusy ? 'در حال خروج…' : 'بله، خارج شو'}
-              </button>
-              <button className="ghost" type="button" onClick={() => setConfirmingLeave(false)}>
-                ماندم
-              </button>
-            </div>
-          </div>
-        ) : (
-          <button
-            className="ghost danger leave-table"
-            type="button"
-            onClick={() => setConfirmingLeave(true)}
-          >
-            خروج از میز
-          </button>
-        )}
-      </div>
     </section>
   );
 }

@@ -19,6 +19,7 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
     view.isPartner && 'is-partner',
     view.isTurn && 'is-turn',
     view.isOffline && 'is-offline',
+    view.wonTrick && 'has-won-trick',
     empty && 'is-empty',
     teamPlay ? (view.isMyTeam ? 'team-ours' : 'team-theirs') : 'team-solo',
   ]
@@ -33,6 +34,7 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
     view.isHakem ? 'حاکم' : '',
     view.isTurn ? 'نوبت اوست' : '',
     view.isOffline ? 'ارتباطش قطع شده' : '',
+    view.wonTrick ? 'این دست را برد' : '',
     view.cardCount !== undefined ? `${view.cardCount} کارت` : '',
   ]
     .filter(Boolean)
@@ -63,7 +65,7 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
 
       <div className="table-seat__played">
         {view.playedCard ? (
-          <PlayingCard card={view.playedCard} compact />
+          <PlayingCard card={view.playedCard} compact played />
         ) : (
           <span className="table-seat__empty-slot" aria-hidden="true" />
         )}

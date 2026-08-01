@@ -51,7 +51,7 @@ export function DuelPhasePanels({
           <p>{game.stockCount ?? 0} کارت در دسته مانده است.</p>
           {pendingDraw ? (
             <div className="draw-decision">
-              <PlayingCard card={pendingDraw.card} compact />
+              <PlayingCard card={pendingDraw.card} compact played />
               <div className="draw-actions">
                 <button className="primary" type="button" onClick={() => resolveDraw(true)}>
                   نگه می‌دارم

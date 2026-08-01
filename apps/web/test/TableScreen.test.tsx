@@ -95,17 +95,17 @@ function renderScreen(over: { room?: RoomView; game?: any; leaveRoom?: () => voi
 }
 
 describe('a seated player can always leave', () => {
-  it('offers a leave button during a live game', () => {
+  it('offers a leave control during a live game', () => {
     renderScreen();
     expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
   });
 
-  it('offers a leave button in the lobby', () => {
+  it('offers a leave control in the lobby', () => {
     renderScreen({ room: room({ status: 'lobby' }), game: undefined });
     expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
   });
 
-  it('offers a leave button once the match is finished', () => {
+  it('offers a leave control once the match is finished', () => {
     renderScreen({ room: room({ status: 'finished' }) });
     expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
   });
@@ -114,7 +114,10 @@ describe('a seated player can always leave', () => {
     const leaveRoom = vi.fn();
     renderScreen({ room: room({ status: 'playing' }), game: undefined, leaveRoom });
     expect(screen.getByText('میز در دسترس نیست')).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
+    // Both the recovery panel and the corner icon can get the player out.
+    const exits = screen.getAllByRole('button', { name: 'خروج از میز' });
+    expect(exits.length).toBeGreaterThan(0);
+    fireEvent.click(exits[exits.length - 1]!);
     expect(leaveRoom).toHaveBeenCalledOnce();
   });
 

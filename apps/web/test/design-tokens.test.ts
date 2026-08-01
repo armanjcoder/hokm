@@ -252,3 +252,55 @@ describe('the seat ring is responsive and token driven', () => {
     expect(table).not.toMatch(/\.table-seat\.team-[01]\b/);
   });
 });
+
+describe('card face and animation', () => {
+  const table = read(path.join(stylesDir, 'table.css'));
+
+  it('repeats the index in the opposite corner so overlapped cards stay readable', () => {
+    expect(table).toContain('.card__index--flipped');
+    expect(table).toMatch(/\.card__index--flipped\s*\{[^}]*rotate\(180deg\)/);
+  });
+
+  it('staggers the deal but caps the delay so long hands still finish quickly', () => {
+    expect(table).toContain('card-deal');
+    // A 17 card hand must not take 17 * delay to appear.
+    expect(table).toMatch(/min\(var\(--card-index[^)]*\),\s*\d+\)/);
+  });
+
+  it('animates a played card landing and a won trick', () => {
+    expect(table).toContain('@keyframes card-land');
+    expect(table).toContain('@keyframes seat-won');
+  });
+
+  it('only lifts cards on devices that truly hover', () => {
+    // A hover transform on touch sticks after the tap ends.
+    expect(table).toContain('@media (hover: hover)');
+  });
+
+  it('marks illegal cards without hiding them', () => {
+    const blocked = table.slice(table.indexOf('.card.is-blocked'));
+    expect(blocked).toMatch(/grayscale/);
+  });
+});
+
+describe('top bar leave control', () => {
+  const shell = read(path.join(stylesDir, 'shell.css'));
+
+  it('expands the icon hit area to a full tap target', () => {
+    const rule = shell.slice(shell.indexOf('.icon-button::after'));
+    expect(rule).toContain('var(--tap-target)');
+    // A centred overlay needs a positioned ancestor, otherwise it anchors to
+    // the page and the enlarged hit area lands somewhere else entirely.
+    expect(shell.slice(shell.indexOf('.icon-button {'))).toMatch(/position:\s*relative/);
+  });
+
+  it('opens the popover from the inline end so RTL does not push it off screen', () => {
+    const rule = shell.slice(shell.indexOf('.leave-popover {'));
+    expect(rule).toContain('inset-inline-end');
+    expect(rule).not.toMatch(/inset-inline-start:\s*0/);
+  });
+
+  it('never lets the popover grow wider than the screen', () => {
+    expect(shell.slice(shell.indexOf('.leave-popover {'))).toMatch(/max-width:\s*min\(/);
+  });
+});

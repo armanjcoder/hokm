@@ -58,7 +58,6 @@ function renderTable(g: any) {
       discard={noop}
       draw={noop}
       resolveDraw={noop}
-      leaveRoom={noop}
     />,
   );
 }
@@ -127,7 +126,6 @@ describe('low hand redeal (ده‌لو کم)', () => {
         discard={noop}
         draw={noop}
         resolveDraw={noop}
-      leaveRoom={noop}
       />,
     );
     fireEvent.click(screen.getByText('درخواست پخش دوباره'));
@@ -147,7 +145,6 @@ describe('low hand redeal (ده‌لو کم)', () => {
         discard={noop}
         draw={noop}
         resolveDraw={noop}
-      leaveRoom={noop}
       />,
     );
     expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
@@ -235,68 +232,8 @@ describe('players are identifiable at the table', () => {
         discard={noop}
         draw={noop}
         resolveDraw={noop}
-        leaveRoom={noop}
-      />,
+        />,
     );
     expect(screen.getByText('قطع')).toBeDefined();
-  });
-});
-
-describe('leaving the table mid game', () => {
-  function renderWithLeave(leaveRoom: () => void, leaveBusy = false) {
-    return render(
-      <GameTable
-        room={baseRoom()}
-        game={game({ phase: 'playing', handScore: { tricks: { 0: 0, 1: 0 } } })}
-        meId="p0"
-        chooseSuit={noop}
-        play={noop}
-        nextHand={noop}
-        requestRedeal={noop}
-        discard={noop}
-        draw={noop}
-        resolveDraw={noop}
-        leaveRoom={leaveRoom}
-        leaveBusy={leaveBusy}
-      />,
-    );
-  }
-
-  it('offers a way out without closing the whole bot', () => {
-    renderWithLeave(noop);
-    expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
-  });
-
-  it('does not leave on the first tap', () => {
-    const leave = vi.fn();
-    renderWithLeave(leave);
-    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
-    expect(leave).not.toHaveBeenCalled();
-  });
-
-  it('explains that the seat is kept, then leaves on confirmation', () => {
-    const leave = vi.fn();
-    renderWithLeave(leave);
-    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
-    expect(screen.getByText(/صندلی‌ات نگه داشته می‌شود/)).toBeDefined();
-    fireEvent.click(screen.getByRole('button', { name: 'بله، خارج شو' }));
-    expect(leave).toHaveBeenCalledOnce();
-  });
-
-  it('lets the player change their mind', () => {
-    const leave = vi.fn();
-    renderWithLeave(leave);
-    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
-    fireEvent.click(screen.getByRole('button', { name: 'ماندم' }));
-    expect(leave).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
-  });
-
-  it('shows progress and blocks a double submit while leaving', () => {
-    const leave = vi.fn();
-    renderWithLeave(leave, true);
-    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
-    const confirm = screen.getByRole('button', { name: 'در حال خروج…' });
-    expect((confirm as HTMLButtonElement).disabled).toBe(true);
   });
 });

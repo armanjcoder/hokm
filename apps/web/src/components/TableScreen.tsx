@@ -70,7 +70,15 @@ export function TableScreen({
 }) {
   return (
     <main className="app-shell">
-      <TopBar room={room} me={me} apiUrl={apiUrl} connection={connection} showRules={showRules} />
+      <TopBar
+        room={room}
+        me={me}
+        apiUrl={apiUrl}
+        connection={connection}
+        showRules={showRules}
+        leaveRoom={room.status === 'abandoned' ? undefined : lobby.leaveRoom}
+        leaveBusy={lobbyBusy}
+      />
 
       {room.status === 'lobby' && (
         <Lobby
@@ -80,21 +88,18 @@ export function TableScreen({
           busy={lobbyBusy}
           invite={invite}
           showRules={showRules}
-          {...lobby}
+          toggleReady={lobby.toggleReady}
+          addBot={lobby.addBot}
+          setBotDifficulty={lobby.setBotDifficulty}
+          removeBot={lobby.removeBot}
+          updateSettings={lobby.updateSettings}
         />
       )}
 
       {room.status === 'abandoned' && <AbandonedNotice onNewTable={onNewTable} />}
 
       {room.status !== 'lobby' && room.status !== 'abandoned' && game && (
-        <GameTable
-          room={room}
-          game={game}
-          meId={session.playerId}
-          leaveRoom={lobby.leaveRoom}
-          leaveBusy={lobbyBusy}
-          {...table}
-        />
+        <GameTable room={room} game={game} meId={session.playerId} {...table} />
       )}
 
       {/* A table can be marked as playing while its game state is missing, for

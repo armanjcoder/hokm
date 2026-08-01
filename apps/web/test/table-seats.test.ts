@@ -244,3 +244,69 @@ describe('team colour is relative to the viewer', () => {
     }
   });
 });
+
+describe('the finished trick stays visible until the next one starts', () => {
+  const card = (id: string) => ({ id, suit: 'spades', rank: 'A' }) as never;
+
+  it('keeps showing the last trick while the current one is empty', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({
+        currentTrick: { plays: [] },
+        completedTricks: [
+          {
+            leaderSeat: 0,
+            winnerSeat: 2,
+            plays: [0, 1, 2, 3].map((seat) => ({ seat, card: card(`c${seat}`) })),
+          },
+        ],
+      } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    // All four cards are still on the table rather than blanking instantly.
+    expect(views.filter((v) => v.playedCard).length).toBe(4);
+    expect(views.find((v) => v.wonTrick)!.seat).toBe(2);
+  });
+
+  it('prefers the live trick once the next card is played', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({
+        currentTrick: { plays: [{ seat: 1, card: card('live') }] },
+        completedTricks: [
+          { leaderSeat: 0, winnerSeat: 2, plays: [{ seat: 0, card: card('old') }] },
+        ],
+      } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(views.filter((v) => v.playedCard).length).toBe(1);
+    expect(views.find((v) => v.seat === 1)!.playedCard!.id).toBe('live');
+    expect(views.every((v) => !v.wonTrick)).toBe(true);
+  });
+
+  it('ignores a trick that has no recorded winner', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({
+        currentTrick: { plays: [] },
+        completedTricks: [{ leaderSeat: 0, plays: [{ seat: 0, card: card('x') }] }],
+      } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(views.every((v) => !v.playedCard)).toBe(true);
+    expect(views.every((v) => !v.wonTrick)).toBe(true);
+  });
+
+  it('copes with a game that has no completed tricks yet', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ currentTrick: { plays: [] } } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(views.every((v) => !v.wonTrick)).toBe(true);
+  });
+});

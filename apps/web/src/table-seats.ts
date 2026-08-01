@@ -35,6 +35,8 @@ export interface SeatView {
   cardCount: number | undefined;
   /** The card this seat played in the current trick, if any. */
   playedCard: PublicGameView['currentTrick']['plays'][number]['card'] | undefined;
+  /** True while the just-finished trick is being shown sweeping to its winner. */
+  wonTrick: boolean;
   /** A human who dropped their connection. Bots are never "offline". */
   isOffline: boolean;
 }
@@ -69,8 +71,15 @@ export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOption
 
   // Keyed by plain seat numbers so lookups do not depend on the branded Seat
   // type flowing through unchanged.
+  // Between tricks the current one is already empty, so fall back to the trick
+  // that just finished. Without this the cards vanish the instant the fourth
+  // one lands and nobody can see what actually happened.
+  const resolving = game.currentTrick.plays.length === 0 ? lastCompletedTrick(game) : undefined;
+  const visiblePlays = resolving?.plays ?? game.currentTrick.plays;
+  const winnerSeat = resolving?.winnerSeat;
+
   const playedBySeat = new Map<number, SeatView['playedCard']>(
-    game.currentTrick.plays.map((play) => [Number(play.seat), play.card]),
+    visiblePlays.map((play) => [Number(play.seat), play.card]),
   );
   const countBySeat = new Map<number, number | undefined>(
     (game.players ?? []).map((player) => [
@@ -98,6 +107,7 @@ export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOption
       isTurn: seat === game.currentTurnSeat,
       cardCount: countBySeat.get(seat),
       playedCard: playedBySeat.get(seat),
+      wonTrick: winnerSeat !== undefined && Number(winnerSeat) === seat,
       isOffline: Boolean(player) && !player?.isBot && player?.connected === false,
     } satisfies SeatView;
   });
@@ -126,6 +136,21 @@ export function seatInitials(view: SeatView): string {
   const words = name.split(/\s+/).filter(Boolean).slice(0, 2);
   const initials = words.map((word) => [...word][0] ?? '').join('');
   return initials || String(view.seat + 1);
+}
+
+/**
+ * The trick that was just completed, if the table is between tricks.
+ *
+ * While a trick is being played the cards sit in `currentTrick`. The moment the
+ * last card lands the engine moves it to `completedTricks` and clears the
+ * current one, so this is what should be shown sweeping towards its winner
+ * instead of the table blanking instantly.
+ */
+export function lastCompletedTrick(game: PublicGameView) {
+  const tricks = game.completedTricks ?? [];
+  const last = tricks[tricks.length - 1];
+  if (!last || last.winnerSeat === undefined) return undefined;
+  return last;
 }
 
 /** Whose turn it is, phrased for the turn banner. */
