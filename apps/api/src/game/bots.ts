@@ -36,6 +36,18 @@ const MAX_BOT_STEPS = 200;
  */
 export const BOT_MOVE_DELAY_MS = Number(process.env.HOKM_BOT_MOVE_DELAY_MS ?? 900);
 
+/**
+ * Extra pause after a trick completes, before the next one begins.
+ *
+ * This has to live on the server. Clients hold the finished cards on screen so
+ * everyone can read them, but if the server starts the next trick underneath
+ * that pause the held cards are replaced immediately and the collection
+ * animation never gets to run. Pausing here keeps every client in step.
+ *
+ * Must comfortably exceed the client's own hold plus its sweep.
+ */
+export const TRICK_PAUSE_MS = Number(process.env.HOKM_TRICK_PAUSE_MS ?? 6000);
+
 /** Rooms with a bot move already queued, so a burst of events cannot stack up. */
 const pending = new Map<string, ReturnType<typeof setTimeout>>();
 
@@ -71,15 +83,54 @@ export function scheduleBotSteps(room: Room, delayMs: number = BOT_MOVE_DELAY_MS
     return;
   }
 
+  // A trick that just completed stays on the table until everyone has seen it.
+  const pauseMs = pauseFor(delayMs);
+  const wait = delayMs + (justCompletedTrick(room) ? pauseMs : 0);
+
   const timer = setTimeout(() => {
     pending.delete(room.id);
     const moved = advanceOneBotStep(room);
     if (!moved) return;
     publish?.(room);
     scheduleBotSteps(room, delayMs);
-  }, delayMs);
+  }, wait);
   timer.unref?.();
   pending.set(room.id, timer);
+}
+
+/**
+ * The between-tricks pause that goes with a given move delay.
+ *
+ * Pacing is either on or off as a whole: a caller that switches off the move
+ * delay (tests, or a bots-only table being resolved) must not then be made to
+ * wait seconds between tricks.
+ */
+function pauseFor(delayMs: number): number {
+  return delayMs <= 0 ? 0 : TRICK_PAUSE_MS;
+}
+
+/**
+ * Whether play should be blocked because the last trick is still on show.
+ *
+ * Returns false when the pause is switched off, so a table with pacing disabled
+ * is never blocked by a rule that exists purely to protect an animation.
+ */
+export function isTrickPauseActive(room: Room): boolean {
+  return pauseFor(BOT_MOVE_DELAY_MS) > 0 && justCompletedTrick(room);
+}
+
+/**
+ * True when the table is sitting between tricks.
+ *
+ * The engine empties `currentTrick` the moment the last card lands, so an empty
+ * trick with completed ones behind it means the previous trick has just been
+ * resolved and is still being shown.
+ */
+export function justCompletedTrick(room: Room): boolean {
+  const game = room.game;
+  if (!game || game.phase !== 'playing') return false;
+  if (game.currentTrick.plays.length > 0) return false;
+  return (game.completedTricks?.length ?? 0) > 0;
 }
 
 /** The bot that should act next, if any. */

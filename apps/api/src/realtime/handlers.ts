@@ -10,7 +10,7 @@ import {
   resolveDraw,
 } from '@hokm/game-engine';
 import { normalizeError } from '../errors.js';
-import { scheduleBotSteps, setBotStepPublisher } from '../game/bots.js';
+import { isTrickPauseActive, scheduleBotSteps, setBotStepPublisher } from '../game/bots.js';
 import {
   clearHakemDrawTimeout,
   requireActiveGame,
@@ -118,6 +118,13 @@ function handlePlayCard(payload: unknown, ack: Ack): void {
     const room = requireRoom(roomId);
     requireSession(room, playerId, token);
     const game = requireActiveGame(room);
+
+    // A human playing the instant a trick resolves would replace the cards
+    // everyone is still reading, so the same pause applies to them.
+    if (isTrickPauseActive(room)) {
+      ack?.({ ok: false, error: 'TRICK_IN_PROGRESS', message: 'صبر کن تا دست قبلی جمع شود.' });
+      return;
+    }
 
     room.game = playCard(game, playerId, cardId);
     scheduleBotSteps(room);
