@@ -8,6 +8,8 @@
 
   .hand {
     justify-content: center;
+    /* Cards are taller here, so the reserved row grows to match. */
+    min-height: calc(106px + var(--space-4) + var(--space-5) + var(--safe-bottom));
   }
 
   .card {

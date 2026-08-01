@@ -4,6 +4,7 @@ import {
   advanceOneBotStep,
   autoAdvanceBots,
   BOT_MOVE_DELAY_MS,
+  cancelBotSteps,
   createBot,
 } from '../src/game/bots.js';
 import { maybeStartGame } from '../src/game/room-service.js';
@@ -142,19 +143,32 @@ describe('bot pacing', () => {
     const room = soloRoom();
     for (const player of room.players) player.ready = true;
     maybeStartGame(room);
-    if (room.game?.phase === 'choosing_hakem') room.game = finishHakemDraw(room.game);
+    // Any timer `maybeStartGame` queued would otherwise keep moving bots while
+    // this test inspects the state.
+    cancelBotSteps(room.id);
+    // Pin the hand into the playing phase so the assertion is about stepping,
+    // not about whichever phase the random hakem draw happened to leave behind.
+    while (room.game && room.game.phase !== 'playing') {
+      if (room.game.phase === 'choosing_hakem') {
+        room.game = finishHakemDraw(room.game);
+        continue;
+      }
+      if (!advanceOneBotStep(room)) break;
+    }
+    expect(room.game?.phase).toBe('playing');
 
     const before = room.game!.currentTrick.plays.length;
     const moved = advanceOneBotStep(room);
     const after = room.game!.currentTrick.plays.length;
 
     expect(moved).toBe(true);
-    // Either a card was played, or the bot acted in a non-playing phase.
-    expect(after - before).toBeLessThanOrEqual(1);
+    // Exactly one card, never a whole trick at once.
+    expect(after - before).toBe(1);
   });
 
   it('reports when no bot can act', () => {
     const room = soloRoom();
+    cancelBotSteps(room.id);
     room.players = room.players.filter((player) => !player.isBot);
     // No bots left, so there is nothing to advance.
     expect(advanceOneBotStep(room)).toBe(false);

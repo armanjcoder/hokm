@@ -371,8 +371,65 @@ describe('cards size themselves in any layout context', () => {
   it('reserves a seat slot at least as large as the card it holds', () => {
     // Otherwise a landing card would resize the ring on every trick.
     const slot = rule(table, '.table-seat__played');
-    const slotWidth = Number(slot.match(/min-width:\s*(\d+)px/)?.[1]);
+    const slotWidth = Number(slot.match(/width:\s*(\d+)px/)?.[1]);
     const cardWidth = Number(rule(table, '.card.compact').match(/width:\s*(\d+)px/)?.[1]);
     expect(slotWidth).toBeGreaterThanOrEqual(cardWidth);
+  });
+});
+
+describe('cards never disturb the rest of the table', () => {
+  const table = read(path.join(stylesDir, 'table.css'));
+  const responsive = read(path.join(stylesDir, 'responsive.css'));
+
+  function rule(css: string, selector: string): string {
+    const at = css.indexOf(`${selector} {`);
+    expect(at, `${selector} should exist`).toBeGreaterThan(-1);
+    return css.slice(at, css.indexOf('}', at));
+  }
+
+  it('gives the card stage a fixed size, not a minimum', () => {
+    // With only a min-size, a landing or stacked card can grow the seat, and
+    // because every seat shares one grid the whole ring shifts.
+    const stage = rule(table, '.table-seat__played');
+    expect(stage).toMatch(/width:\s*\d+px/);
+    expect(stage).toMatch(/height:\s*\d+px/);
+    expect(stage).toMatch(/position:\s*relative/);
+  });
+
+  it('paints cards in a layer that is out of normal flow', () => {
+    const layer = rule(table, '.table-seat__played > *');
+    expect(layer).toMatch(/position:\s*absolute/);
+  });
+
+  it('keeps a stack of draw cards from growing the seat', () => {
+    const stack = rule(table, '.draw-stack');
+    expect(stack).toMatch(/width:\s*\d+px/);
+    expect(stack).toMatch(/height:\s*\d+px/);
+    expect(rule(table, '.draw-stack__card')).toMatch(/position:\s*absolute/);
+  });
+
+  it('fixes the seat badge height so appearing tags do not resize it', () => {
+    // The "نوبت" tag comes and goes on every turn change.
+    expect(rule(table, '.table-seat__badge')).toMatch(/height:\s*\d+px/);
+  });
+
+  it('never lets seat tags wrap onto a second line', () => {
+    expect(rule(table, '.table-seat__tags')).toMatch(/flex-wrap:\s*nowrap/);
+  });
+
+  it('reserves room for the turn message, whatever its length', () => {
+    const badge = rule(table, '.turn-badge');
+    expect(badge).toMatch(/min-height:\s*\d+px/);
+    expect(badge).toMatch(/min-width:/);
+  });
+
+  it('reserves the height of the hand so dealing does not push the table up', () => {
+    expect(rule(table, '.hand')).toMatch(/min-height:/);
+    // The wide breakpoint uses taller cards and must reserve more.
+    expect(rule(responsive, '.hand')).toMatch(/min-height:/);
+  });
+
+  it('reserves the centre of the table', () => {
+    expect(rule(table, '.table-center__core')).toMatch(/min-height:\s*\d+px/);
   });
 });

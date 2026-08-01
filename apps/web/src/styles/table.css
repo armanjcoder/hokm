@@ -108,6 +108,8 @@
   align-content: center;
   gap: var(--space-2);
   text-align: center;
+  /* Holds its own size so the ring around it never shifts. */
+  min-height: 96px;
 }
 
 .table-event {
@@ -151,6 +153,10 @@
   background: var(--surface-inset);
   border: 1px solid transparent;
   max-width: 100%;
+  /* Tags appear and disappear as the turn moves. Without a fixed height the
+     badge would grow, resizing the seat and nudging the whole ring. */
+  height: 40px;
+  overflow: hidden;
 }
 
 .table-seat__avatar {
@@ -195,8 +201,15 @@
 
 .table-seat__tags {
   display: inline-flex;
-  flex-wrap: wrap;
+  /* Wrapping would make the badge taller and shift the ring, so tags stay on
+     one line and simply clip if a seat somehow earns too many. */
+  flex-wrap: nowrap;
   gap: var(--space-1);
+  overflow: hidden;
+}
+
+.tag {
+  flex: 0 0 auto;
 }
 
 .tag {
@@ -264,15 +277,27 @@
   color: var(--text-muted);
 }
 
+/* The card stage.
+   Cards are painted in a layer that is taken out of normal flow, so a card
+   landing, stacking or flying can never change the size of the seat and shove
+   the rest of the table around. The stage itself is a fixed box that always
+   occupies the same space whether it holds a card or not. */
 .table-seat__played {
-  display: grid;
-  place-items: center;
-  /* Fixed box so seats never resize when a card lands or is cleared. */
-  min-height: 84px;
-  min-width: 58px;
-  /* A played card flies in from well outside this box, so the slot must not
-     clip it mid-flight. */
+  position: relative;
+  width: 58px;
+  height: 84px;
+  /* Never let a card's size feed back into the grid. */
+  flex: 0 0 auto;
+  /* A played card flies in from well outside this box, so it must not clip. */
   overflow: visible;
+}
+
+/* Everything inside the stage is absolutely positioned: zero layout impact. */
+.table-seat__played > * {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
 }
 
 .table-seat__empty-slot {
@@ -294,8 +319,14 @@
 
   .table-seat.is-left .table-seat__played,
   .table-seat.is-right .table-seat__played {
-    min-height: 62px;
-    min-width: 42px;
+    width: 42px;
+    height: 62px;
+  }
+
+  .table-seat.is-left .draw-stack,
+  .table-seat.is-right .draw-stack {
+    width: 42px;
+    height: 62px;
   }
 
   .table-seat.is-left .table-seat__empty-slot,
@@ -326,6 +357,14 @@
   background: var(--surface-inset);
   color: var(--text-primary);
   font-weight: 800;
+  /* The text swings between "نوبت توئه" and a full sentence naming the hakem.
+     A fixed height and a reserved width stop the centre of the table from
+     resizing every time the message changes. */
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  min-width: 16ch;
+  max-width: 100%;
 }
 
 .hand {
@@ -338,7 +377,13 @@
   display: flex;
   gap: var(--space-2);
   overflow-x: auto;
+  overflow-y: hidden;
   direction: ltr;
+  /* Cards arrive one at a time during the deal and leave as they are played.
+     Reserving the full card height keeps the row, and everything above it,
+     from jumping as the hand fills and empties. */
+  min-height: calc(92px + var(--space-4) + var(--space-5) + var(--safe-bottom));
+  align-items: flex-end;
 }
 
 /* A card face laid out to the traditional standard: the index (rank over suit)
@@ -630,17 +675,18 @@
 /* Hakem draw: cards land in each seat's own slot. A draw can go round more
    than once, so repeats stack with a small offset instead of replacing. */
 .draw-stack {
-  position: relative;
-  display: grid;
-  place-items: center;
-  min-width: 58px;
-  min-height: 84px;
+  /* Sized to the stage and out of flow, so extra cards cannot grow the seat. */
+  width: 58px;
+  height: 84px;
 }
 
 .draw-stack__card {
-  grid-area: 1 / 1;
+  position: absolute;
+  inset: 0;
   /* Each extra card sits slightly down and across, so the depth of the stack
      is legible at a glance. */
+  /* Each extra card sits slightly down and across, so the depth of the stack is
+     legible. Purely visual: the stack box itself never changes size. */
   transform: translate(
     calc(var(--stack-depth, 0) * 5px),
     calc(var(--stack-depth, 0) * 5px)
