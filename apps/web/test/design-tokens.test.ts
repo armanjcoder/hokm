@@ -216,3 +216,39 @@ describe('viewport height units', () => {
     }
   });
 });
+
+describe('the seat ring is responsive and token driven', () => {
+  const table = read(path.join(stylesDir, 'table.css'));
+  const responsive = read(path.join(stylesDir, 'responsive.css'));
+
+  it('lays out each table size with its own grid template', () => {
+    expect(table).toContain('grid-template-areas');
+    // Two player tables have nobody left or right.
+    expect(table).toContain('.table-center.seats-2');
+  });
+
+  it('reserves space for played cards so the ring never jumps', () => {
+    const slot = table.slice(table.indexOf('.table-seat__played'));
+    expect(slot).toMatch(/min-height:/);
+    expect(slot).toMatch(/min-width:/);
+  });
+
+  it('reserves space for the event line so the centre never jumps', () => {
+    expect(table.slice(table.indexOf('.table-event'))).toMatch(/min-height:/);
+  });
+
+  it('adapts the tight side columns on very narrow phones', () => {
+    expect(table).toContain('@media (max-width: 380px)');
+  });
+
+  it('gives the ring more room on wider screens', () => {
+    expect(responsive).toContain('.table-center');
+  });
+
+  it('names team sides relative to the viewer, not by absolute index', () => {
+    // `team-0`/`team-1` would colour your own side differently depending on
+    // which seat you drew, which is exactly the bug this guards.
+    expect(table).toContain('.table-seat.team-theirs');
+    expect(table).not.toMatch(/\.table-seat\.team-[01]\b/);
+  });
+});

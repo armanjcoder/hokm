@@ -58,6 +58,7 @@ function renderTable(g: any) {
       discard={noop}
       draw={noop}
       resolveDraw={noop}
+      leaveRoom={noop}
     />,
   );
 }
@@ -126,6 +127,7 @@ describe('low hand redeal (ده‌لو کم)', () => {
         discard={noop}
         draw={noop}
         resolveDraw={noop}
+      leaveRoom={noop}
       />,
     );
     fireEvent.click(screen.getByText('درخواست پخش دوباره'));
@@ -145,6 +147,7 @@ describe('low hand redeal (ده‌لو کم)', () => {
         discard={noop}
         draw={noop}
         resolveDraw={noop}
+      leaveRoom={noop}
       />,
     );
     expect(screen.queryByText('درخواست پخش دوباره')).toBeNull();
@@ -167,5 +170,133 @@ describe('bam badge', () => {
       }),
     );
     expect(screen.getByText(/بام روی حاکم/)).toBeDefined();
+  });
+});
+
+describe('players are identifiable at the table', () => {
+  function playingGame(overrides: any = {}) {
+    return game({
+      phase: 'playing',
+      handScore: { tricks: { 0: 0, 1: 0 } },
+      players: [0, 1, 2, 3].map((seat) => ({ seat, cardCount: 13 - seat })),
+      ...overrides,
+    });
+  }
+
+  it('shows every player by name instead of a bare seat number', () => {
+    renderTable(playingGame());
+    for (const seat of [1, 2, 3, 4]) {
+      expect(screen.getAllByText(new RegExp(`بازیکن ${seat}`)).length).toBeGreaterThan(0);
+    }
+  });
+
+  it('names whose turn it is rather than saying "seat 2"', () => {
+    renderTable(playingGame({ currentTurnSeat: 1 }));
+    expect(screen.getByText('نوبت بازیکن 2')).toBeDefined();
+    expect(screen.queryByText(/نوبت صندلی/)).toBeNull();
+  });
+
+  it('says it is your turn when it is', () => {
+    renderTable(playingGame({ currentTurnSeat: 0 }));
+    expect(screen.getByText('نوبت توئه')).toBeDefined();
+  });
+
+  it('marks you, your partner and the hakem', () => {
+    renderTable(playingGame());
+    expect(screen.getByText('تو')).toBeDefined();
+    expect(screen.getByText('یار')).toBeDefined();
+    expect(screen.getByText('حاکم')).toBeDefined();
+  });
+
+  it('describes each seat for assistive technology', () => {
+    renderTable(playingGame({ currentTurnSeat: 2 }));
+    // Seat 2 is the partner in a four player game seen from seat 0.
+    const partner = screen.getByLabelText(/بازیکن 3.*یار تو.*نوبت اوست/);
+    expect(partner).toBeDefined();
+  });
+
+  it('shows remaining card counts for opponents', () => {
+    renderTable(playingGame());
+    expect(screen.getByText('12 کارت')).toBeDefined();
+  });
+
+  it('flags a disconnected opponent', () => {
+    const room = baseRoom();
+    room.players[1] = { ...room.players[1]!, connected: false };
+    render(
+      <GameTable
+        room={room}
+        game={playingGame()}
+        meId="p0"
+        chooseSuit={noop}
+        play={noop}
+        nextHand={noop}
+        requestRedeal={noop}
+        discard={noop}
+        draw={noop}
+        resolveDraw={noop}
+        leaveRoom={noop}
+      />,
+    );
+    expect(screen.getByText('قطع')).toBeDefined();
+  });
+});
+
+describe('leaving the table mid game', () => {
+  function renderWithLeave(leaveRoom: () => void, leaveBusy = false) {
+    return render(
+      <GameTable
+        room={baseRoom()}
+        game={game({ phase: 'playing', handScore: { tricks: { 0: 0, 1: 0 } } })}
+        meId="p0"
+        chooseSuit={noop}
+        play={noop}
+        nextHand={noop}
+        requestRedeal={noop}
+        discard={noop}
+        draw={noop}
+        resolveDraw={noop}
+        leaveRoom={leaveRoom}
+        leaveBusy={leaveBusy}
+      />,
+    );
+  }
+
+  it('offers a way out without closing the whole bot', () => {
+    renderWithLeave(noop);
+    expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
+  });
+
+  it('does not leave on the first tap', () => {
+    const leave = vi.fn();
+    renderWithLeave(leave);
+    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
+    expect(leave).not.toHaveBeenCalled();
+  });
+
+  it('explains that the seat is kept, then leaves on confirmation', () => {
+    const leave = vi.fn();
+    renderWithLeave(leave);
+    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
+    expect(screen.getByText(/صندلی‌ات نگه داشته می‌شود/)).toBeDefined();
+    fireEvent.click(screen.getByRole('button', { name: 'بله، خارج شو' }));
+    expect(leave).toHaveBeenCalledOnce();
+  });
+
+  it('lets the player change their mind', () => {
+    const leave = vi.fn();
+    renderWithLeave(leave);
+    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
+    fireEvent.click(screen.getByRole('button', { name: 'ماندم' }));
+    expect(leave).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'خروج از میز' })).toBeDefined();
+  });
+
+  it('shows progress and blocks a double submit while leaving', () => {
+    const leave = vi.fn();
+    renderWithLeave(leave, true);
+    fireEvent.click(screen.getByRole('button', { name: 'خروج از میز' }));
+    const confirm = screen.getByRole('button', { name: 'در حال خروج…' });
+    expect((confirm as HTMLButtonElement).disabled).toBe(true);
   });
 });

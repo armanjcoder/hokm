@@ -4,6 +4,8 @@ import { SUIT_META, suitSymbol, type RoomView } from '../types.js';
 import { PlayingCard } from './PlayingCard.js';
 import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
+import { TableSeat } from './TableSeat.js';
+import { buildSeatViews, turnMessage } from '../table-seats.js';
 
 export interface GameTableProps {
   room: RoomView;
@@ -16,6 +18,9 @@ export interface GameTableProps {
   discard: (cardIds: string[]) => void;
   draw: () => void;
   resolveDraw: (keep: boolean) => void;
+  /** Leaving mid-game keeps the seat so the player can come back. */
+  leaveRoom: () => void;
+  leaveBusy?: boolean;
 }
 
 export function GameTable({
@@ -29,6 +34,8 @@ export function GameTable({
   discard,
   draw,
   resolveDraw,
+  leaveRoom,
+  leaveBusy = false,
 }: GameTableProps) {
   const me = room.players.find((p) => p.id === meId);
   const hakem = room.players.find((p) => p.seat === game.hakemSeat);
@@ -36,6 +43,7 @@ export function GameTable({
   const isHakem = me?.seat === game.hakemSeat;
   const config = getModeConfig(game.mode);
   const [selected, setSelected] = useState<string[]>([]);
+  const [confirmingLeave, setConfirmingLeave] = useState(false);
 
   const iHaveDiscarded = me ? (game.discardedSeats ?? []).some((seat) => seat === me.seat) : false;
   const pendingDraw = game.pendingDraw;
@@ -56,6 +64,7 @@ export function GameTable({
   }
 
   const discarding = game.phase === 'discarding' && !iHaveDiscarded;
+  const seats = buildSeatViews({ mode: game.mode, players: room.players, game, mySeat: me?.seat });
 
   return (
     <section className="table-wrap">
@@ -122,16 +131,18 @@ export function GameTable({
         resolveDraw={resolveDraw}
       />
 
-      <div className="table-center">
-        <div className="turn-badge" role="status" aria-live="polite">
-          {isMyTurn ? 'نوبت توئه' : `نوبت صندلی ${game.currentTurnSeat + 1}`}
+      <div className={`table-center seats-${config.seats}`}>
+        {seats.map((view) => (
+          <TableSeat key={view.seat} view={view} teamPlay={config.teamPlay} />
+        ))}
+        <div className="table-center__core">
+          <div className="turn-badge" role="status" aria-live="polite">
+            {turnMessage(seats)}
+          </div>
+          <small className="table-event" role="status" aria-live="polite">
+            {game.lastEvent}
+          </small>
         </div>
-        <div className="played-cards">
-          {game.currentTrick.plays.map((played) => (
-            <PlayingCard key={`${played.seat}-${played.card.id}`} card={played.card} compact />
-          ))}
-        </div>
-        <small>{game.lastEvent}</small>
       </div>
 
       {(game.phase === 'hand_complete' || game.phase === 'game_complete') && (
@@ -164,6 +175,37 @@ export function GameTable({
               onClick={() => play(card)}
             />
           ),
+        )}
+      </div>
+
+      <div className="table-footer">
+        {confirmingLeave ? (
+          // Leaving a live game is disruptive for everyone else, so it takes a
+          // deliberate second tap rather than one stray press near the hand.
+          <div className="leave-confirm" role="group" aria-label="تأیید خروج از میز">
+            <p>وسط بازی بیرون بری، صندلی‌ات نگه داشته می‌شود و می‌توانی برگردی.</p>
+            <div className="leave-confirm__actions">
+              <button
+                className="ghost danger"
+                type="button"
+                disabled={leaveBusy}
+                onClick={leaveRoom}
+              >
+                {leaveBusy ? 'در حال خروج…' : 'بله، خارج شو'}
+              </button>
+              <button className="ghost" type="button" onClick={() => setConfirmingLeave(false)}>
+                ماندم
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button
+            className="ghost danger leave-table"
+            type="button"
+            onClick={() => setConfirmingLeave(true)}
+          >
+            خروج از میز
+          </button>
         )}
       </div>
     </section>

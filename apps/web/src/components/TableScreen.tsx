@@ -87,7 +87,32 @@ export function TableScreen({
       {room.status === 'abandoned' && <AbandonedNotice onNewTable={onNewTable} />}
 
       {room.status !== 'lobby' && room.status !== 'abandoned' && game && (
-        <GameTable room={room} game={game} meId={session.playerId} {...table} />
+        <GameTable
+          room={room}
+          game={game}
+          meId={session.playerId}
+          leaveRoom={lobby.leaveRoom}
+          leaveBusy={lobbyBusy}
+          {...table}
+        />
+      )}
+
+      {/* A table can be marked as playing while its game state is missing, for
+          example after a partially written save. Without this the screen would
+          be blank and the player would have no way out except closing the app. */}
+      {room.status !== 'lobby' && room.status !== 'abandoned' && !game && (
+        <section className="glass wait-card phase-card">
+          <h3>میز در دسترس نیست</h3>
+          <p>وضعیت این میز روی سرور ناقص است. می‌توانی از میز خارج شوی و میز تازه بسازی.</p>
+          <button
+            className="ghost danger"
+            type="button"
+            disabled={lobbyBusy}
+            onClick={lobby.leaveRoom}
+          >
+            خروج از میز
+          </button>
+        </section>
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}

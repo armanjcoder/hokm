@@ -1,0 +1,73 @@
+import { seatInitials, seatLabel, type SeatView } from '../table-seats.js';
+import { PlayingCard } from './PlayingCard.js';
+
+/**
+ * One player's place at the table.
+ *
+ * Shows who they are, whether they are the hakem, whether it is their turn and
+ * the card they just played. Everything a player needs to follow the round
+ * without guessing which anonymous seat number belongs to whom.
+ */
+export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolean }) {
+  const label = seatLabel(view);
+  const empty = !view.player;
+
+  const classes = [
+    'table-seat',
+    `is-${view.position}`,
+    view.isSelf && 'is-self',
+    view.isPartner && 'is-partner',
+    view.isTurn && 'is-turn',
+    view.isOffline && 'is-offline',
+    empty && 'is-empty',
+    teamPlay ? (view.isMyTeam ? 'team-ours' : 'team-theirs') : 'team-solo',
+  ]
+    .filter(Boolean)
+    .join(' ');
+
+  // One sentence per seat so a screen reader gets the same picture a sighted
+  // player gets from colour, position and badges.
+  const described = [
+    label,
+    view.isSelf ? 'خودت' : view.isPartner ? 'یار تو' : empty ? '' : 'حریف',
+    view.isHakem ? 'حاکم' : '',
+    view.isTurn ? 'نوبت اوست' : '',
+    view.isOffline ? 'ارتباطش قطع شده' : '',
+    view.cardCount !== undefined ? `${view.cardCount} کارت` : '',
+  ]
+    .filter(Boolean)
+    .join('، ');
+
+  return (
+    <div className={classes} aria-label={described}>
+      <div className="table-seat__badge">
+        <span className="table-seat__avatar" aria-hidden="true">
+          {seatInitials(view)}
+        </span>
+        <span className="table-seat__meta">
+          <strong className="table-seat__name">
+            {label}
+            {view.player?.isBot && <span aria-hidden="true"> 🤖</span>}
+          </strong>
+          <span className="table-seat__tags">
+            {view.isHakem && <em className="tag tag--hakem">حاکم</em>}
+            {view.isSelf && <em className="tag tag--self">تو</em>}
+            {view.isPartner && <em className="tag tag--partner">یار</em>}
+            {view.isOffline && <em className="tag tag--offline">قطع</em>}
+            {view.cardCount !== undefined && !view.isSelf && (
+              <em className="tag tag--count">{view.cardCount} کارت</em>
+            )}
+          </span>
+        </span>
+      </div>
+
+      <div className="table-seat__played">
+        {view.playedCard ? (
+          <PlayingCard card={view.playedCard} compact />
+        ) : (
+          <span className="table-seat__empty-slot" aria-hidden="true" />
+        )}
+      </div>
+    </div>
+  );
+}
