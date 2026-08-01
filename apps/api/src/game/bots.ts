@@ -27,6 +27,75 @@ export const BOT_NAMES = ['ربات نیکا', 'ربات آرش', 'ربات سا
 /** Safety net against an unexpected engine state looping forever. */
 const MAX_BOT_STEPS = 200;
 
+/**
+ * Pause between bot moves.
+ *
+ * Without it a table of bots resolves an entire trick between two frames, which
+ * reads as cards teleporting rather than a game being played. Configurable so
+ * the end to end tests do not have to sit through it.
+ */
+export const BOT_MOVE_DELAY_MS = Number(process.env.HOKM_BOT_MOVE_DELAY_MS ?? 900);
+
+/** Rooms with a bot move already queued, so a burst of events cannot stack up. */
+const pending = new Map<string, ReturnType<typeof setTimeout>>();
+
+/** Broadcaster injected by the composition root, to avoid an import cycle. */
+let publish: ((room: Room) => void) | undefined;
+
+export function setBotStepPublisher(handler: (room: Room) => void): void {
+  publish = handler;
+}
+
+export function cancelBotSteps(roomId: string): void {
+  const timer = pending.get(roomId);
+  if (!timer) return;
+  clearTimeout(timer);
+  pending.delete(roomId);
+}
+
+/**
+ * Plays at most one bot move, then schedules the next after a pause.
+ *
+ * Each step is published so every client sees the cards arrive one by one,
+ * which is the whole point of the delay.
+ */
+export function scheduleBotSteps(room: Room, delayMs: number = BOT_MOVE_DELAY_MS): void {
+  if (pending.has(room.id)) return;
+  if (!nextBotSeat(room)) return;
+
+  // A zero delay means pacing is switched off entirely, so resolve the moves
+  // inline. Queuing a macrotask per move would otherwise turn a single trick
+  // into dozens of event loop round trips.
+  if (delayMs <= 0) {
+    autoAdvanceBots(room);
+    return;
+  }
+
+  const timer = setTimeout(() => {
+    pending.delete(room.id);
+    const moved = advanceOneBotStep(room);
+    if (!moved) return;
+    publish?.(room);
+    scheduleBotSteps(room, delayMs);
+  }, delayMs);
+  timer.unref?.();
+  pending.set(room.id, timer);
+}
+
+/** The bot that should act next, if any. */
+function nextBotSeat(room: Room): RoomPlayer | undefined {
+  const game = room.game;
+  if (!game) return undefined;
+  if (game.phase === 'game_complete' || game.phase === 'hand_complete') return undefined;
+  if (game.phase === 'choosing_hakem') return undefined;
+  if (game.phase === 'discarding') {
+    return room.players.find(
+      (player) => player.isBot && !(game.discardedSeats ?? []).includes(player.seat),
+    );
+  }
+  return room.players.find((player) => player.isBot && player.seat === game.currentTurnSeat);
+}
+
 export function createBot(
   room: Room,
   seat: Seat,
@@ -50,83 +119,88 @@ function difficultyOf(player: RoomPlayer): BotDifficulty {
 }
 
 /**
- * Plays every consecutive bot turn until it is a human's move again.
+ * Plays exactly one bot move.
  *
- * Mutates `room.game` in place because callers persist and broadcast the room
- * immediately afterwards.
+ * Returns false when no bot could act, which is the signal to stop stepping.
+ * Splitting a single move out of the loop is what allows the paced scheduler to
+ * put a visible pause between bot turns.
+ */
+export function advanceOneBotStep(room: Room): boolean {
+  const game = room.game;
+  if (!game) return false;
+
+  if (game.phase === 'game_complete') {
+    room.status = 'finished';
+    return false;
+  }
+  if (game.phase === 'hand_complete') return false;
+
+  // The hakem draw is ended by whichever client finishes showing it. A table
+  // with no humans left to report in would otherwise sit in this phase forever,
+  // so the server closes it out itself.
+  if (game.phase === 'choosing_hakem') {
+    if (room.players.some((player) => !player.isBot)) return false;
+    room.game = finishHakemDraw(game);
+    return true;
+  }
+
+  const bot = nextBotSeat(room);
+  if (!bot) return false;
+
+  // A bot must never be able to crash a request handler and leave the table in
+  // a half-updated state; stop advancing and let humans continue instead.
+  try {
+    if (game.phase === 'waiting_for_trump') {
+      // A weak hand is a real disadvantage, so take the redeal when offered.
+      if (game.canRequestRedeal) {
+        room.game = requestRedeal(game, bot.id);
+        return true;
+      }
+      room.game = chooseTrump(game, bot.id, chooseTrumpSuit(game, bot.seat, difficultyOf(bot)));
+      return true;
+    }
+
+    // Two player mode: burn the weakest cards, then draw selectively.
+    if (game.phase === 'discarding') {
+      const config = getModeConfig(game.mode);
+      const burn = chooseDiscards(game, bot.seat, config.discardCount, difficultyOf(bot));
+      room.game = discardCards(game, bot.id, burn);
+      return true;
+    }
+
+    if (game.phase === 'drawing') {
+      if (!game.pendingDraw) {
+        room.game = drawCard(game, bot.id);
+        return true;
+      }
+      const revealed = game.pendingDraw.card;
+      const keep = shouldKeepDraw(revealed, game.trumpSuit, difficultyOf(bot));
+      room.game = resolveDraw(game, bot.id, keep);
+      return true;
+    }
+
+    if (game.phase !== 'playing') return false;
+    const legal = getValidCards(game, bot.id);
+    const card = chooseCard(game, bot.seat, legal, difficultyOf(bot));
+    if (!card) return false;
+    room.game = playCard(game, bot.id, card.id);
+    return true;
+  } catch (error) {
+    console.error(`Bot ${bot.id} could not move in room ${room.id}.`, error);
+    return false;
+  }
+}
+
+/**
+ * Plays every consecutive bot turn immediately.
+ *
+ * Used where the result must be settled synchronously, such as tests and the
+ * bots-only fallback. Interactive play uses `scheduleBotSteps` instead so the
+ * moves are spread out and can actually be followed.
  */
 export function autoAdvanceBots(room: Room): void {
-  if (!room.game) return;
   for (let guard = 0; guard < MAX_BOT_STEPS; guard += 1) {
-    if (!room.game || room.game.phase === 'game_complete') {
-      room.status = 'finished';
-      return;
-    }
-    if (room.game.phase === 'hand_complete') return;
-
-    // The hakem draw is ended by whichever client finishes showing it. A table
-    // with no humans left to report in would otherwise sit in this phase
-    // forever, so the server closes it out itself.
-    if (room.game.phase === 'choosing_hakem') {
-      if (room.players.some((player) => !player.isBot)) return;
-      room.game = finishHakemDraw(room.game);
-      continue;
-    }
-
-    // During discarding every seat acts, not just the one whose turn it is.
-    const bot =
-      room.game.phase === 'discarding'
-        ? room.players.find(
-            (player) => player.isBot && !(room.game?.discardedSeats ?? []).includes(player.seat),
-          )
-        : room.players.find((player) => player.isBot && player.seat === room.game?.currentTurnSeat);
-    if (!bot) return;
-
-    // A bot must never be able to crash a request handler and leave the table
-    // in a half-updated state; stop advancing and let humans continue instead.
-    try {
-      if (room.game.phase === 'waiting_for_trump') {
-        // A weak hand is a real disadvantage, so take the redeal when offered.
-        if (room.game.canRequestRedeal) {
-          room.game = requestRedeal(room.game, bot.id);
-          continue;
-        }
-        room.game = chooseTrump(
-          room.game,
-          bot.id,
-          chooseTrumpSuit(room.game, bot.seat, difficultyOf(bot)),
-        );
-        continue;
-      }
-
-      // Two player mode: burn the weakest cards, then draw selectively.
-      if (room.game.phase === 'discarding') {
-        const config = getModeConfig(room.game.mode);
-        const burn = chooseDiscards(room.game, bot.seat, config.discardCount, difficultyOf(bot));
-        room.game = discardCards(room.game, bot.id, burn);
-        continue;
-      }
-
-      if (room.game.phase === 'drawing') {
-        if (!room.game.pendingDraw) {
-          room.game = drawCard(room.game, bot.id);
-          continue;
-        }
-        const revealed = room.game.pendingDraw.card;
-        const keep = shouldKeepDraw(revealed, room.game.trumpSuit, difficultyOf(bot));
-        room.game = resolveDraw(room.game, bot.id, keep);
-        continue;
-      }
-
-      if (room.game.phase !== 'playing') return;
-      const legal = getValidCards(room.game, bot.id);
-      const card = chooseCard(room.game, bot.seat, legal, difficultyOf(bot));
-      if (!card) return;
-      room.game = playCard(room.game, bot.id, card.id);
-    } catch (error) {
-      console.error(`Bot ${bot.id} could not move in room ${room.id}.`, error);
-      return;
-    }
+    if (!advanceOneBotStep(room)) return;
   }
 }
 

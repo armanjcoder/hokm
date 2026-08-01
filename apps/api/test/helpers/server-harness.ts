@@ -43,6 +43,8 @@ export class ServerHarness {
       cwd: apiRoot,
       env: {
         ...process.env,
+        // Bot pacing is a presentation concern; tests should not wait on it.
+        HOKM_BOT_MOVE_DELAY_MS: '0',
         PORT: String(this.port),
         DB_PATH: this.dbPath,
         SERVE_WEB_DIST: 'false',

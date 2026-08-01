@@ -1,6 +1,13 @@
 import { chooseTrump, createGame, getValidCards, playCard, type Card } from '@hokm/game-engine';
 import { describe, expect, it } from 'vitest';
-import { autoAdvanceBots, createBot } from '../src/game/bots.js';
+import {
+  advanceOneBotStep,
+  autoAdvanceBots,
+  BOT_MOVE_DELAY_MS,
+  createBot,
+} from '../src/game/bots.js';
+import { maybeStartGame } from '../src/game/room-service.js';
+import { finishHakemDraw } from '@hokm/game-engine';
 import { chooseCard, chooseTrumpSuit } from '../src/game/bot-ai.js';
 import type { Room } from '../src/types.js';
 
@@ -125,5 +132,35 @@ describe('autoAdvanceBots', () => {
     autoAdvanceBots(room);
     expect(room.game.trumpSuit).toBeDefined();
     expect(room.game.phase).not.toBe('waiting_for_trump');
+  });
+});
+
+describe('bot pacing', () => {
+  it('advances exactly one move per step', () => {
+    // The whole point of stepping is that a trick does not resolve between two
+    // frames; a step that played several cards would defeat it.
+    const room = soloRoom();
+    for (const player of room.players) player.ready = true;
+    maybeStartGame(room);
+    if (room.game?.phase === 'choosing_hakem') room.game = finishHakemDraw(room.game);
+
+    const before = room.game!.currentTrick.plays.length;
+    const moved = advanceOneBotStep(room);
+    const after = room.game!.currentTrick.plays.length;
+
+    expect(moved).toBe(true);
+    // Either a card was played, or the bot acted in a non-playing phase.
+    expect(after - before).toBeLessThanOrEqual(1);
+  });
+
+  it('reports when no bot can act', () => {
+    const room = soloRoom();
+    room.players = room.players.filter((player) => !player.isBot);
+    // No bots left, so there is nothing to advance.
+    expect(advanceOneBotStep(room)).toBe(false);
+  });
+
+  it('uses a delay long enough to follow by default', () => {
+    expect(BOT_MOVE_DELAY_MS).toBeGreaterThanOrEqual(500);
   });
 });

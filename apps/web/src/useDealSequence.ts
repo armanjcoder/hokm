@@ -14,10 +14,10 @@ import { getModeConfig, type PublicGameView } from '@hokm/game-engine';
  */
 
 /** Gap between individual cards. Slow enough to see each one land. */
-export const DEAL_CARD_MS = 200;
+export const DEAL_CARD_MS = 300;
 
 /** Extra pause when the dealer moves on to the next player. */
-export const DEAL_SEAT_GAP_MS = 260;
+export const DEAL_SEAT_GAP_MS = 400;
 
 function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'

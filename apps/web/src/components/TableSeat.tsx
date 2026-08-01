@@ -65,7 +65,21 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
       </div>
 
       <div className="table-seat__played">
-        {view.playedCard ? (
+        {(view.drawCards?.length ?? 0) > 0 ? (
+          // The hakem draw can go round more than once, so each new card is
+          // stacked slightly over the last rather than replacing it.
+          <span className="draw-stack">
+            {(view.drawCards ?? []).map((card, depth) => (
+              <span
+                key={card!.id}
+                className="draw-stack__card"
+                style={{ '--stack-depth': depth } as React.CSSProperties}
+              >
+                <PlayingCard card={card!} compact played from={view.position} />
+              </span>
+            ))}
+          </span>
+        ) : view.playedCard ? (
           // Keyed by card id on purpose. Without it React reuses the same DOM
           // node for whatever card lands next, and a CSS mount animation never
           // replays, so the card would silently swap instead of landing.

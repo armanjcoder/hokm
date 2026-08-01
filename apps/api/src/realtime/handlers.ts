@@ -10,7 +10,7 @@ import {
   resolveDraw,
 } from '@hokm/game-engine';
 import { normalizeError } from '../errors.js';
-import { autoAdvanceBots } from '../game/bots.js';
+import { scheduleBotSteps, setBotStepPublisher } from '../game/bots.js';
 import {
   clearHakemDrawTimeout,
   requireActiveGame,
@@ -36,10 +36,19 @@ type Ack = ((response: unknown) => void) | undefined;
 
 export function registerSocketHandlers(io: Server): void {
   // A table whose clients never report back must still start its hand.
+  // Each paced bot move is persisted and broadcast, so clients see the cards
+  // arrive one by one rather than a whole trick appearing at once.
+  setBotStepPublisher((room) => {
+    if (room.game?.phase === 'game_complete') room.status = 'finished';
+    touchRoom(room);
+    persistRoom(room);
+    void emitRoom(room);
+  });
+
   setHakemDrawTimeoutHandler((room) => {
     if (room.game?.phase !== 'choosing_hakem') return;
     room.game = finishHakemDraw(room.game);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
     void emitRoom(room);
@@ -92,7 +101,7 @@ function handleChooseTrump(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = chooseTrump(game, playerId, suit);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
 
@@ -111,7 +120,7 @@ function handlePlayCard(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = playCard(game, playerId, cardId);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     if (room.game.phase === 'game_complete') room.status = 'finished';
     touchRoom(room);
     persistRoom(room);
@@ -142,7 +151,7 @@ function handleHakemDrawDone(payload: unknown, ack: Ack): void {
 
     clearHakemDrawTimeout(room.id);
     room.game = finishHakemDraw(game);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
 
@@ -161,7 +170,7 @@ function handleNextHand(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = continueToNextHand(game);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
 
@@ -181,7 +190,7 @@ function handleRedeal(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = requestRedeal(game, playerId);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
 
@@ -202,7 +211,7 @@ function handleDiscard(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = discardCards(game, playerId, cardIds);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
 
@@ -239,7 +248,7 @@ function handleResolveDraw(payload: unknown, ack: Ack): void {
     const game = requireActiveGame(room);
 
     room.game = resolveDraw(game, playerId, keep);
-    autoAdvanceBots(room);
+    scheduleBotSteps(room);
     touchRoom(room);
     persistRoom(room);
 

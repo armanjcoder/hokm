@@ -87,7 +87,7 @@ function landKeyframes(from: TablePosition | undefined): Keyframe[] {
  * is given real time on screen. Dealing stays brisk because it happens to many
  * cards at once and would otherwise feel sluggish.
  */
-const DURATION: Record<EntranceKind, number> = { deal: 420, land: 620 };
+const DURATION: Record<EntranceKind, number> = { deal: 520, land: 900 };
 
 /** Cards after this position share the last delay, so long hands stay snappy. */
 const MAX_STAGGER_STEPS = 12;

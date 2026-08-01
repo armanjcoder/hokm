@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { PublicGameView } from '@hokm/game-engine';
 import {
   buildSeatViews,
+  drawMessage,
   seatInitials,
   seatLabel,
   teamRosters,
@@ -411,5 +412,95 @@ describe('turn message', () => {
       mySeat: 0,
     });
     expect(turnMessage(views)).toBe('صبر کن…');
+  });
+});
+
+describe('hakem draw cards land on the seats themselves', () => {
+  const drawCard = (id: string) => ({ id, suit: 'spades', rank: 'A' }) as never;
+
+  it('puts each turned card in front of the seat it belongs to', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ phase: 'choosing_hakem' } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+      drawRevealed: [
+        { seat: 0, card: drawCard('a') },
+        { seat: 1, card: drawCard('b') },
+      ],
+    });
+    expect(views.find((v) => v.seat === 0)!.drawCards.map((c) => c!.id)).toEqual(['a']);
+    expect(views.find((v) => v.seat === 1)!.drawCards.map((c) => c!.id)).toEqual(['b']);
+    expect(views.find((v) => v.seat === 2)!.drawCards).toEqual([]);
+  });
+
+  it('stacks a second round on top of the first', () => {
+    // A draw only ends on an ace, so it can easily go round more than once.
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ phase: 'choosing_hakem' } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+      drawRevealed: [
+        { seat: 0, card: drawCard('first') },
+        { seat: 0, card: drawCard('second') },
+      ],
+    });
+    expect(views.find((v) => v.seat === 0)!.drawCards.map((c) => c!.id)).toEqual([
+      'first',
+      'second',
+    ]);
+  });
+
+  it('keeps the order the cards were turned in', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ phase: 'choosing_hakem' } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+      drawRevealed: [
+        { seat: 2, card: drawCard('one') },
+        { seat: 2, card: drawCard('two') },
+        { seat: 2, card: drawCard('three') },
+      ],
+    });
+    expect(views.find((v) => v.seat === 2)!.drawCards.map((c) => c!.id)).toEqual([
+      'one',
+      'two',
+      'three',
+    ]);
+  });
+
+  it('is empty when no draw is running', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game(),
+      mySeat: 0,
+    });
+    expect(views.every((v) => v.drawCards.length === 0)).toBe(true);
+  });
+});
+
+describe('draw message', () => {
+  it('explains what is happening before the ace lands', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ phase: 'choosing_hakem' } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(drawMessage(views, undefined)).toBe('کارت می‌آید تا حاکم مشخص شود…');
+  });
+
+  it('names the winner once the ace has landed', () => {
+    const views = buildSeatViews({
+      mode: 'classic4',
+      players: players(4),
+      game: game({ phase: 'choosing_hakem' } as unknown as Partial<PublicGameView>),
+      mySeat: 0,
+    });
+    expect(drawMessage(views, 1)).toBe('سارا آس آورد و حاکم شد');
+    expect(drawMessage(views, 0)).toBe('آس آوردی! تو حاکمی');
   });
 });

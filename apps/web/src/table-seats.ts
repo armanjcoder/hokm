@@ -40,6 +40,13 @@ export interface SeatView {
   playedCard: PublicGameView['currentTrick']['plays'][number]['card'] | undefined;
   /** True while the just-finished trick is being shown sweeping to its winner. */
   wonTrick: boolean;
+  /**
+   * Cards turned in front of this seat while the hakem is being chosen.
+   *
+   * A draw can go round more than once, so these stack on top of each other in
+   * the seat's card slot rather than replacing one another.
+   */
+  drawCards: SeatView['playedCard'][];
   /** A human who dropped their connection. Bots are never "offline". */
   isOffline: boolean;
 }
@@ -63,10 +70,18 @@ export interface BuildSeatsOptions {
   game: PublicGameView;
   /** Seat of the viewer. Falls back to seat 0 for spectators. */
   mySeat: number | undefined;
+  /** Hakem-draw cards revealed so far, in the order they were turned. */
+  drawRevealed?: Array<{ seat: number; card: SeatView['playedCard'] }>;
 }
 
 /** Builds one entry per seat, ordered from the viewer clockwise. */
-export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOptions): SeatView[] {
+export function buildSeatViews({
+  mode,
+  players,
+  game,
+  mySeat,
+  drawRevealed = [],
+}: BuildSeatsOptions): SeatView[] {
   const config = getModeConfig(mode);
   const seats = config.seats;
   const ring = RINGS[seats] ?? RINGS[4]!;
@@ -116,6 +131,7 @@ export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOption
       isTurn: awaitingAction && seat === game.currentTurnSeat,
       cardCount: countBySeat.get(seat),
       playedCard: playedBySeat.get(seat),
+      drawCards: drawRevealed.filter((entry) => entry.seat === seat).map((entry) => entry.card),
       wonTrick: winnerSeat !== undefined && Number(winnerSeat) === seat,
       isOffline: Boolean(player) && !player?.isBot && player?.connected === false,
     } satisfies SeatView;
@@ -172,6 +188,14 @@ export function turnMessage(seats: SeatView[]): string {
   if (!active) return 'صبر کن…';
   if (active.isSelf) return 'نوبت توئه';
   return `نوبت ${seatLabel(active)}`;
+}
+
+/** What to show in the middle of the table while the hakem is being drawn. */
+export function drawMessage(seats: SeatView[], hakemSeat: number | undefined): string {
+  if (hakemSeat === undefined) return 'کارت می‌آید تا حاکم مشخص شود…';
+  const winner = seats.find((view) => view.seat === hakemSeat);
+  if (!winner) return 'حاکم مشخص شد';
+  return winner.isSelf ? 'آس آوردی! تو حاکمی' : `${seatLabel(winner)} آس آورد و حاکم شد`;
 }
 
 /** Names of the players on each side, for the team score headings. */

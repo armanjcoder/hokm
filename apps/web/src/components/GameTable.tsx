@@ -5,11 +5,10 @@ import { PlayingCard } from './PlayingCard.js';
 import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
 import { TableSeat } from './TableSeat.js';
-import { buildSeatViews, teamRosters, turnMessage } from '../table-seats.js';
+import { buildSeatViews, drawMessage, teamRosters, turnMessage } from '../table-seats.js';
 import { useTrickHold } from '../useTrickHold.js';
 import { useHakemDraw } from '../useHakemDraw.js';
 import { useDealSequence } from '../useDealSequence.js';
-import { HakemDrawOverlay } from './HakemDrawOverlay.js';
 
 export interface GameTableProps {
   room: RoomView;
@@ -71,9 +70,15 @@ export function GameTable({
   }
 
   const discarding = game.phase === 'discarding' && !iHaveDiscarded;
-  const seats = buildSeatViews({ mode: game.mode, players: room.players, game, mySeat: me?.seat });
-  const rosters = teamRosters(seats);
   const hakemDraw = useHakemDraw(game, hakemDrawDone ? { onFinished: hakemDrawDone } : {});
+  const seats = buildSeatViews({
+    mode: game.mode,
+    players: room.players,
+    game,
+    mySeat: me?.seat,
+    drawRevealed: hakemDraw.revealed.map((entry) => ({ seat: entry.seat, card: entry.card })),
+  });
+  const rosters = teamRosters(seats);
   // Cards are released one at a time so the deal can be watched.
   const dealtCount = useDealSequence(game, me?.seat);
   // Scores are keyed by absolute team index, but the strip is labelled from the
@@ -157,21 +162,13 @@ export function GameTable({
         resolveDraw={resolveDraw}
       />
 
-      {hakemDraw.running && (
-        <HakemDrawOverlay
-          revealed={hakemDraw.revealed}
-          seats={seats}
-          hakemSeat={hakemDraw.hakemSeat}
-        />
-      )}
-
       <div className={`table-center seats-${config.seats}`}>
         {seats.map((view) => (
           <TableSeat key={view.seat} view={view} teamPlay={config.teamPlay} />
         ))}
         <div className="table-center__core">
           <div className="turn-badge" role="status" aria-live="polite">
-            {turnMessage(seats)}
+            {hakemDraw.running ? drawMessage(seats, hakemDraw.hakemSeat) : turnMessage(seats)}
           </div>
           <small className="table-event" role="status" aria-live="polite">
             {game.lastEvent}

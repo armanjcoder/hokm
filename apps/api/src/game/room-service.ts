@@ -12,7 +12,7 @@ import { evaluateReadiness, hasNoHumans, pickNextHost, seatsFor } from '../room-
 import { createPlayerToken, verifyPlayerSession } from '../session.js';
 import { persistRoom, randomCode, rooms, touchRoom, uniqueRoomId } from '../state.js';
 import type { Room, RoomPlayer } from '../types.js';
-import { autoAdvanceBots } from './bots.js';
+import { scheduleBotSteps } from './bots.js';
 
 /** Table lifecycle: creating, joining, readiness, leaving and authorisation. */
 
@@ -196,7 +196,8 @@ export function maybeStartGame(room: Room): boolean {
     },
   );
   room.status = 'playing';
-  autoAdvanceBots(room);
+  // Bots move on a timer from here so their turns can be followed.
+  scheduleBotSteps(room);
   touchRoom(room);
 
   // Clients end the draw when their animation finishes; this is the backstop
