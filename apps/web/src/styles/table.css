@@ -264,7 +264,7 @@
 
   .table-seat.is-left .card.compact,
   .table-seat.is-right .card.compact {
-    flex-basis: 42px;
+    width: 42px;
     height: 62px;
   }
 
@@ -299,18 +299,20 @@
   direction: ltr;
 }
 
-/* A card face modelled on a real one: corner index, centre pip, and the index
-   repeated rotated so an overlapped card is still readable from its corner. */
 /* A card face laid out to the traditional standard: the index (rank over suit)
    sits tight in the top-left corner and is repeated rotated 180 degrees in the
-   bottom-right, with a large pip in the middle. The corner index is what makes
-   a fanned hand readable, so it is absolutely positioned rather than sharing
-   space in a flow layout. */
+   bottom-right, with a large pip in the middle.
+
+   The corner indices are absolutely positioned, which leaves the card with no
+   in-flow content, so it must state its own width and height. Relying on
+   `flex-basis` alone would size it only inside `.hand` (a flex container) and
+   collapse it to zero anywhere else, such as the seat grid on the table. */
 .card {
   position: relative;
   direction: ltr;
-  flex: 0 0 62px;
+  width: 62px;
   height: 92px;
+  flex: 0 0 auto;
   border-radius: var(--radius-md);
   background: linear-gradient(155deg, var(--card-face) 62%, var(--card-face-edge));
   color: var(--card-black);
@@ -394,7 +396,7 @@
 }
 
 .card.compact {
-  flex-basis: 58px;
+  width: 58px;
   height: 84px;
 }
 

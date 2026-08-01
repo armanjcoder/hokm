@@ -324,3 +324,52 @@ describe('top bar leave control', () => {
     expect(shell.slice(shell.indexOf('.leave-popover {'))).toMatch(/max-width:\s*min\(/);
   });
 });
+
+describe('cards size themselves in any layout context', () => {
+  const table = read(path.join(stylesDir, 'table.css'));
+  const responsive = read(path.join(stylesDir, 'responsive.css'));
+
+  /** Grabs a rule body by exact selector, ignoring media-query wrappers. */
+  function rule(css: string, selector: string): string {
+    const at = css.indexOf(`${selector} {`);
+    expect(at, `${selector} should exist`).toBeGreaterThan(-1);
+    return css.slice(at, css.indexOf('}', at));
+  }
+
+  it('gives the card an explicit width, not just a flex basis', () => {
+    // The card lives in two very different parents: `.hand` is a flex row and
+    // `.table-seat__played` is a grid cell. `flex-basis` only sizes flex items,
+    // so relying on it made every card on the table collapse to zero width.
+    const base = rule(table, '.card');
+    expect(base).toMatch(/width:\s*\d+px/);
+    expect(base).toMatch(/height:\s*\d+px/);
+  });
+
+  it('sizes the compact variant explicitly too', () => {
+    const compact = rule(table, '.card.compact');
+    expect(compact).toMatch(/width:\s*\d+px/);
+    expect(compact).toMatch(/height:\s*\d+px/);
+  });
+
+  it('never sizes a card with flex-basis anywhere', () => {
+    for (const file of styleFiles) {
+      const css = read(path.join(stylesDir, file));
+      const cardRules = css.match(/\.card[^{]*\{[^}]*\}/g) ?? [];
+      for (const body of cardRules) {
+        expect(body, `${file}: cards must not depend on flex-basis`).not.toMatch(/flex-basis/);
+      }
+    }
+  });
+
+  it('keeps the wide-screen override on width as well', () => {
+    expect(rule(responsive, '.card')).toMatch(/width:\s*\d+px/);
+  });
+
+  it('reserves a seat slot at least as large as the card it holds', () => {
+    // Otherwise a landing card would resize the ring on every trick.
+    const slot = rule(table, '.table-seat__played');
+    const slotWidth = Number(slot.match(/min-width:\s*(\d+)px/)?.[1]);
+    const cardWidth = Number(rule(table, '.card.compact').match(/width:\s*(\d+)px/)?.[1]);
+    expect(slotWidth).toBeGreaterThanOrEqual(cardWidth);
+  });
+});
