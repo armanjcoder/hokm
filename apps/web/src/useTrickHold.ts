@@ -22,7 +22,7 @@ import { lastCompletedTrick } from './table-seats.js';
  * Measured from the moment the last card has finished flying in, not from when
  * it was played, so the reading time is what it looks like.
  */
-export const TRICK_HOLD_MS = 2600;
+export const TRICK_HOLD_MS = 4200;
 
 /** How long the cards take to sweep to the winner once the hold is over. */
 export const TRICK_SWEEP_MS = 620;
@@ -42,9 +42,11 @@ export function useTrickHold(
   holdMs: number = TRICK_HOLD_MS,
   sweepMs: number = TRICK_SWEEP_MS,
 ): TrickHoldState {
-  const [held, setHeld] = useState<PublicGameView['completedTricks'][number] | undefined>();
-  const [sweeping, setSweeping] = useState(false);
-  const shownRef = useRef<string | undefined>(undefined);
+  // Which trick has been released, rather than which is held. Holding is the
+  // default so it can be decided during render; releasing is what needs a timer.
+  const [releasedId, setReleasedId] = useState<string | undefined>();
+  const [sweepingId, setSweepingId] = useState<string | undefined>();
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const finished = lastCompletedTrick(game);
   const liveCount = game.currentTrick?.plays.length ?? 0;
@@ -52,38 +54,30 @@ export function useTrickHold(
   // A trick is identified by the cards in it, which is stable and cheap.
   const finishedId = finished?.plays.map((play) => play.card.id).join('|');
 
-  useEffect(() => {
-    // The next trick has begun, so stop holding immediately.
-    if (liveCount > 0) {
-      setHeld(undefined);
-      setSweeping(false);
-      return;
-    }
-    if (!finished || !finishedId) return;
-    // Only start a hold for a trick we have not already shown.
-    if (shownRef.current === finishedId) return;
+  // Decided during render, not in an effect. Doing this in an effect meant the
+  // cards unmounted for one frame before the hold was applied, so the whole
+  // trick blinked out and then re-entered together.
+  const holding = Boolean(finished && finishedId && liveCount === 0 && releasedId !== finishedId);
 
-    shownRef.current = finishedId;
-    setHeld(finished);
-    setSweeping(false);
+  useEffect(() => {
+    if (!holding || !finishedId) return;
 
     // Reading time starts once the final card has actually arrived.
     const sweepAt = LANDING_ALLOWANCE_MS + holdMs;
-    const startSweep = setTimeout(() => setSweeping(true), sweepAt);
-    const clear = setTimeout(() => {
-      setHeld(undefined);
-      setSweeping(false);
-    }, sweepAt + sweepMs);
-
+    timers.current = [
+      setTimeout(() => setSweepingId(finishedId), sweepAt),
+      setTimeout(() => setReleasedId(finishedId), sweepAt + sweepMs),
+    ];
     return () => {
-      clearTimeout(startSweep);
-      clearTimeout(clear);
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
     };
-  }, [finishedId, liveCount, holdMs, sweepMs, finished]);
+  }, [holding, finishedId, holdMs, sweepMs]);
 
-  if (!held || liveCount > 0) return { game, sweepingTo: undefined };
+  if (!holding || !finished) return { game, sweepingTo: undefined };
   return {
-    game: { ...game, currentTrick: held },
-    sweepingTo: sweeping ? (held.winnerSeat as number | undefined) : undefined,
+    game: { ...game, currentTrick: finished },
+    sweepingTo:
+      sweepingId === finishedId ? (finished.winnerSeat as number | undefined) : undefined,
   };
 }

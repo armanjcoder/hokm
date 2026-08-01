@@ -128,7 +128,12 @@ export function useCardEntrance({
         duration: DURATION[kind],
         delay,
         easing: 'cubic-bezier(0.22, 1, 0.36, 1)',
-        fill: 'both',
+        // `backwards`, never `both`. A filled-forwards animation keeps
+        // overriding `transform` and `opacity` after it ends, which outranks
+        // CSS and silently defeats the sweep that collects a finished trick.
+        // Filling backwards still holds the first keyframe during the stagger
+        // delay, so a card never flashes at full size before its turn.
+        fill: 'backwards',
       },
     );
 

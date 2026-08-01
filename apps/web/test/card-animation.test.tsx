@@ -258,3 +258,27 @@ describe('the seat passes its own direction to the card', () => {
     expect(String(calls[0]!.keyframes[0]!.transform)).toMatch(/translate\(0px,\s*-\d+px\)/);
   });
 });
+
+describe('the entrance releases the element when it ends', () => {
+  it('never fills forwards, so CSS can move the card afterwards', () => {
+    // A `fill: 'both'` animation keeps overriding transform and opacity after
+    // it finishes. That outranks CSS and silently defeated the sweep that
+    // collects a finished trick, so the cards just disappeared instead.
+    render(<PlayingCard card={card('c1')} played from="left" />);
+    expect(calls[0]!.options.fill).toBe('backwards');
+  });
+
+  it('still fills backwards, so a staggered card does not flash early', () => {
+    render(<PlayingCard card={card('c1')} index={5} />);
+    expect(calls[0]!.options.fill).toBe('backwards');
+    expect(Number(calls[0]!.options.delay)).toBeGreaterThan(0);
+  });
+
+  it('ends exactly at the resting state, so releasing it is seamless', () => {
+    render(<PlayingCard card={card('c1')} played from="right" />);
+    const last = calls[0]!.keyframes.at(-1)!;
+    expect(last.opacity).toBe(1);
+    expect(String(last.transform)).toContain('translate(0, 0)');
+    expect(String(last.transform)).toContain('scale(1)');
+  });
+});

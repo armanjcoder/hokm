@@ -65,9 +65,11 @@ describe('useTrickHold', () => {
     expect(result.current.game.currentTrick.plays).toHaveLength(0);
   });
 
-  it('holds for about three seconds, long enough to read four cards', () => {
-    expect(TRICK_HOLD_MS).toBeGreaterThanOrEqual(2500);
-    expect(TRICK_HOLD_MS).toBeLessThanOrEqual(4000);
+  it('holds well past the minimum reading time for four cards', () => {
+    // Players asked for noticeably longer than the original pause; the upper
+    // bound only guards against the table feeling frozen.
+    expect(TRICK_HOLD_MS).toBeGreaterThanOrEqual(3500);
+    expect(TRICK_HOLD_MS).toBeLessThanOrEqual(6000);
   });
 
   it('does not clear early', () => {
@@ -227,5 +229,63 @@ describe('the finished trick is collected by its winner', () => {
       } as unknown as Partial<PublicGameView>),
     });
     expect(result.current.sweepingTo).toBeUndefined();
+  });
+});
+
+describe('a completing trick never blinks out', () => {
+  const trick = finishedTrick(['a', 'b', 'c', 'd'], 2);
+
+  it('holds the cards in the very same render the server clears them', () => {
+    // Deciding this in an effect left one painted frame with no cards at all,
+    // so the whole trick vanished and then re-entered together.
+    const live = view({
+      currentTrick: {
+        leaderSeat: 0,
+        plays: trick.plays.slice(0, 3),
+      },
+    } as unknown as Partial<PublicGameView>);
+
+    const { result, rerender } = renderHook(
+      ({ g }: { g: PublicGameView }) => useTrickHold(g),
+      { initialProps: { g: live } },
+    );
+    expect(result.current.game.currentTrick.plays).toHaveLength(3);
+
+    // The fourth card lands: the engine moves the trick to completedTricks and
+    // empties currentTrick in the same update.
+    rerender({
+      g: view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>),
+    });
+
+    // No intermediate empty state: the cards are already held.
+    expect(result.current.game.currentTrick.plays).toHaveLength(4);
+  });
+
+  it('keeps the identical card objects, so nothing remounts', () => {
+    const held = view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>);
+    const { result, rerender } = renderHook(
+      ({ g }: { g: PublicGameView }) => useTrickHold(g),
+      { initialProps: { g: held } },
+    );
+    const before = result.current.game.currentTrick.plays.map((p: any) => p.card);
+    rerender({ g: { ...held } as PublicGameView });
+    const after = result.current.game.currentTrick.plays.map((p: any) => p.card);
+    // Same object identities means React reuses the nodes and no entrance
+    // animation is replayed.
+    before.forEach((card: unknown, i: number) => expect(after[i]).toBe(card));
+  });
+
+  it('does not re-hold a trick once it has been released', () => {
+    const held = view({ completedTricks: [trick] } as unknown as Partial<PublicGameView>);
+    const { result, rerender } = renderHook(
+      ({ g }: { g: PublicGameView }) => useTrickHold(g),
+      { initialProps: { g: held } },
+    );
+    act(() => {
+      vi.advanceTimersByTime(LANDING_MS + TRICK_HOLD_MS + TRICK_SWEEP_MS + 50);
+    });
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
+    rerender({ g: { ...held } as PublicGameView });
+    expect(result.current.game.currentTrick.plays).toHaveLength(0);
   });
 });
