@@ -65,7 +65,10 @@ export function TableSeat({ view, teamPlay }: { view: SeatView; teamPlay: boolea
 
       <div className="table-seat__played">
         {view.playedCard ? (
-          <PlayingCard card={view.playedCard} compact played />
+          // Keyed by card id on purpose. Without it React reuses the same DOM
+          // node for whatever card lands next, and a CSS mount animation never
+          // replays, so the card would silently swap instead of landing.
+          <PlayingCard key={view.playedCard.id} card={view.playedCard} compact played />
         ) : (
           <span className="table-seat__empty-slot" aria-hidden="true" />
         )}

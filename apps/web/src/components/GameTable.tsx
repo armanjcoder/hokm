@@ -18,6 +18,8 @@ export interface GameTableProps {
   discard: (cardIds: string[]) => void;
   draw: () => void;
   resolveDraw: (keep: boolean) => void;
+  /** False while the start overlay is covering the table. */
+  dealReady?: boolean;
 }
 
 export function GameTable({
@@ -31,6 +33,7 @@ export function GameTable({
   discard,
   draw,
   resolveDraw,
+  dealReady = true,
 }: GameTableProps) {
   const me = room.players.find((p) => p.id === meId);
   const hakem = room.players.find((p) => p.seat === game.hakemSeat);
@@ -159,6 +162,7 @@ export function GameTable({
               key={card.id}
               card={card}
               index={index}
+              dealReady={dealReady}
               selected={selected.includes(card.id)}
               onClick={() => toggleSelected(card.id)}
             />
@@ -167,6 +171,7 @@ export function GameTable({
               key={card.id}
               card={card}
               index={index}
+              dealReady={dealReady}
               disabled={!game.validCardIds.includes(card.id)}
               onClick={() => play(card)}
             />

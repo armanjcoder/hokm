@@ -99,7 +99,13 @@ export function TableScreen({
       {room.status === 'abandoned' && <AbandonedNotice onNewTable={onNewTable} />}
 
       {room.status !== 'lobby' && room.status !== 'abandoned' && game && (
-        <GameTable room={room} game={game} meId={session.playerId} {...table} />
+        <GameTable
+          room={room}
+          game={game}
+          meId={session.playerId}
+          dealReady={!starting}
+          {...table}
+        />
       )}
 
       {/* A table can be marked as playing while its game state is missing, for

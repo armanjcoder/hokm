@@ -19,6 +19,12 @@ export function PlayingCard({
   index = 0,
   /** Set for the card sitting in front of a seat, which lands rather than deals. */
   played = false,
+  /**
+   * Whether the dealing animation may run yet. The opening deal happens while
+   * the start overlay still covers the table, so the hand waits for it to clear
+   * and only then adds the animation class, which starts the animation.
+   */
+  dealReady = true,
 }: {
   card: Card;
   disabled?: boolean;
@@ -28,6 +34,7 @@ export function PlayingCard({
   onClick?: () => void;
   index?: number;
   played?: boolean;
+  dealReady?: boolean;
 }) {
   const suit = suitMeta(card.suit);
   const label = `${card.rank} ${suit.label}`;
@@ -36,7 +43,7 @@ export function PlayingCard({
     suit.color,
     compact && 'compact',
     selected && 'selected',
-    played ? 'is-played' : 'is-dealt',
+    played ? 'is-played' : dealReady && 'is-dealt',
     disabled && 'is-blocked',
   ]
     .filter(Boolean)
