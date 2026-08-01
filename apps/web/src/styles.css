@@ -1,4 +1,12 @@
-/* Style entry point. Each file owns one area of the interface. */
+/* Style entry point. Each file owns one area of the interface.
+   Order matters: the font and tokens must resolve before anything uses them. */
+
+/* Self-hosted Vazirmatn. Loading this from Google Fonts used to break the app
+   on networks where `fonts.googleapis.com` is unreachable, leaving Persian text
+   in a default system font. Bundling it removes that dependency entirely. */
+@import '@fontsource-variable/vazirmatn/index.css';
+
+@import './styles/tokens.css';
 @import './styles/base.css';
 @import './styles/shell.css';
 @import './styles/landing.css';
