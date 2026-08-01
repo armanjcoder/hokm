@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react';
 import type { GameMode } from '@hokm/game-engine';
 
 /**
@@ -59,6 +60,38 @@ export function RulesGuide({
   onClose: () => void;
 }) {
   const guide = GUIDES[mode] ?? GUIDES.classic4;
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  // A modal dialog must own the keyboard while it is open: Escape closes it and
+  // Tab cycles inside it, otherwise focus wanders onto the page behind.
+  useEffect(() => {
+    closeRef.current?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== 'Tab') return;
+      const focusable = sheetRef.current?.querySelectorAll<HTMLElement>(
+        'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
+      );
+      if (!focusable || focusable.length === 0) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [onClose]);
 
   return (
     <div
@@ -69,7 +102,7 @@ export function RulesGuide({
       onClick={onClose}
     >
       {/* Stop clicks inside the sheet from closing it. */}
-      <div className="rules-sheet" onClick={(event) => event.stopPropagation()}>
+      <div ref={sheetRef} className="rules-sheet" onClick={(event) => event.stopPropagation()}>
         <h2 id="rules-title">{guide.title}</h2>
         <ol className="rules-steps">
           {guide.steps.map((step) => (
@@ -79,7 +112,7 @@ export function RulesGuide({
         <p className="rules-key">{guide.key}</p>
         {lowHandRedeal && <p className="rules-key">{LOW_HAND_RULE}</p>}
         {bam && <p className="rules-key">{BAM_RULE}</p>}
-        <button className="primary full-width" type="button" onClick={onClose}>
+        <button ref={closeRef} className="primary full-width" type="button" onClick={onClose}>
           فهمیدم
         </button>
       </div>

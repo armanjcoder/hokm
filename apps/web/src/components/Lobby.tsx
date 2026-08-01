@@ -190,7 +190,7 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty,
       </button>
 
       <div className="row-actions">
-        <button className="ghost" onClick={invite}>دعوت دوستان</button>
+        <button className="ghost" type="button" onClick={invite}>دعوت دوستان</button>
         <button className="ghost danger" type="button" disabled={busy} onClick={leaveRoom}>خروج از میز</button>
       </div>
 

@@ -231,7 +231,12 @@ export function App() {
       onNewTable={() => forgetSession('میز قبلی رها شده بود. حالا می‌تونی میز جدید بسازی.')}
       lobby={{ toggleReady, addBot, setBotDifficulty, removeBot, leaveRoom, updateSettings }}
       table={{ chooseSuit, play, nextHand, requestRedeal, discard, draw, resolveDraw }}
-      invite={() => shareRoom(room.id, apiUrl)}
+      invite={() => {
+        void shareRoom(room.id, apiUrl).then((outcome) => {
+          if (outcome === 'copied') setToast('لینک دعوت کپی شد؛ برای دوستانت بفرست.');
+          else if (outcome === 'failed') setToast('کپی لینک انجام نشد. لینک را دستی از نوار آدرس بردار.');
+        });
+      }}
     />
   );
 }

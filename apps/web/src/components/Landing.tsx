@@ -76,10 +76,10 @@ export function Landing(props: {
           <small>اگر از لینک بات وارد شوی، این مقدار خودکار تنظیم می‌شود.</small>
         </details>
         <div className="actions-grid">
-          <button className="primary" disabled={props.loading} onClick={props.createRoom}>ساخت میز جدید</button>
+          <button className="primary" type="button" disabled={props.loading} onClick={props.createRoom}>ساخت میز جدید</button>
           <div className="join-box">
             <input placeholder="کد یا لینک میز" value={props.joinCode} onChange={(e) => props.setJoinCode(e.target.value)} />
-            <button onClick={props.joinRoom} disabled={props.loading}>ورود</button>
+            <button type="button" onClick={props.joinRoom} disabled={props.loading}>ورود</button>
           </div>
         </div>
       </section>

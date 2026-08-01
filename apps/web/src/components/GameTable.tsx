@@ -140,7 +140,7 @@ export function GameTable({
           <ScoreBadge handScore={game.handScore} />
           <p>{game.lastEvent}</p>
           {game.phase === 'hand_complete' && (
-            <button className="primary" onClick={nextHand}>
+            <button className="primary" type="button" onClick={nextHand}>
               راند بعدی
             </button>
           )}
