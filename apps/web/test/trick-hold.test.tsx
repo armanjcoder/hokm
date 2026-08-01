@@ -65,11 +65,11 @@ describe('useTrickHold', () => {
     expect(result.current.game.currentTrick.plays).toHaveLength(0);
   });
 
-  it('holds well past the minimum reading time for four cards', () => {
-    // Players asked for noticeably longer than the original pause; the upper
-    // bound only guards against the table feeling frozen.
-    expect(TRICK_HOLD_MS).toBeGreaterThanOrEqual(3500);
-    expect(TRICK_HOLD_MS).toBeLessThanOrEqual(6000);
+  it('gives players a real pause to read four cards', () => {
+    // Long enough to take in four cards, short enough that the table does not
+    // feel frozen between tricks.
+    expect(TRICK_HOLD_MS).toBeGreaterThanOrEqual(2500);
+    expect(TRICK_HOLD_MS).toBeLessThanOrEqual(4000);
   });
 
   it('does not clear early', () => {

@@ -46,7 +46,7 @@ export const BOT_MOVE_DELAY_MS = Number(process.env.HOKM_BOT_MOVE_DELAY_MS ?? 90
  *
  * Must comfortably exceed the client's own hold plus its sweep.
  */
-export const TRICK_PAUSE_MS = Number(process.env.HOKM_TRICK_PAUSE_MS ?? 6000);
+export const TRICK_PAUSE_MS = Number(process.env.HOKM_TRICK_PAUSE_MS ?? 5000);
 
 /** Rooms with a bot move already queued, so a burst of events cannot stack up. */
 const pending = new Map<string, ReturnType<typeof setTimeout>>();

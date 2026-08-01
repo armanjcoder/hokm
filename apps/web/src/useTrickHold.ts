@@ -22,13 +22,20 @@ import { lastCompletedTrick } from './table-seats.js';
  * Measured from the moment the last card has finished flying in, not from when
  * it was played, so the reading time is what it looks like.
  */
-export const TRICK_HOLD_MS = 4200;
+export const TRICK_HOLD_MS = 3200;
 
 /** How long the cards take to sweep to the winner once the hold is over. */
 export const TRICK_SWEEP_MS = 620;
 
 /** Time the last played card needs to finish its own landing animation. */
-const LANDING_ALLOWANCE_MS = 900;
+export const LANDING_ALLOWANCE_MS = 900;
+
+/**
+ * Everything the client needs from the last card landing to the cards being
+ * gone. The server's between-tricks pause must exceed this, or the next trick
+ * replaces the cards before they can be collected.
+ */
+export const TRICK_CYCLE_MS = LANDING_ALLOWANCE_MS + TRICK_HOLD_MS + TRICK_SWEEP_MS;
 
 export interface TrickHoldState {
   /** The view the table should render. */

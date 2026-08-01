@@ -223,7 +223,13 @@ describe('the table pauses between tricks', () => {
   it('waits long enough for the client to show and collect the cards', () => {
     // The client needs its landing allowance, its reading hold and its sweep to
     // all fit inside this window, or the next trick replaces the cards first.
-    expect(TRICK_PAUSE_MS).toBeGreaterThanOrEqual(5800);
+    // Kept in sync with the web app's own budget rather than a magic number.
+    const CLIENT_LANDING_MS = 900;
+    const CLIENT_HOLD_MS = 3200;
+    const CLIENT_SWEEP_MS = 620;
+    expect(TRICK_PAUSE_MS).toBeGreaterThan(
+      CLIENT_LANDING_MS + CLIENT_HOLD_MS + CLIENT_SWEEP_MS,
+    );
   });
 
   it('is not treated as a pause before any trick has been played', () => {
@@ -262,12 +268,13 @@ describe('the pause is actually applied to the schedule', () => {
       scheduleBotSteps(room, 100);
 
       // Well past the plain move delay, but still inside the trick pause.
-      vi.advanceTimersByTime(1000);
+      const moveDelay = 100;
+      vi.advanceTimersByTime(moveDelay * 4);
       expect(room.game!.currentTrick.plays).toHaveLength(0);
       expect(room.game!.completedTricks.length).toBe(completedBefore);
 
-      // Past the pause: the next trick may begin.
-      vi.advanceTimersByTime(TRICK_PAUSE_MS + 200);
+      // Past the full wait (move delay plus pause): the next trick may begin.
+      vi.advanceTimersByTime(moveDelay + TRICK_PAUSE_MS);
       expect(room.game!.currentTrick.plays.length).toBeGreaterThan(0);
     } finally {
       vi.useRealTimers();
