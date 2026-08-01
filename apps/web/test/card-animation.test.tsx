@@ -110,7 +110,8 @@ describe('a played card really animates', () => {
   it('animates when it lands in a seat', () => {
     render(<TableSeat view={seatView('c1')} teamPlay />);
     expect(calls).toHaveLength(1);
-    expect(String(calls[0]!.keyframes[0]!.transform)).toMatch(/translateY\(-/);
+    // The seat used here sits on the left, so the card flies in from the left.
+    expect(String(calls[0]!.keyframes[0]!.transform)).toMatch(/translate\(-\d+px/);
   });
 
   it('animates again when a different card lands in the same seat', () => {
@@ -177,5 +178,75 @@ describe('animation is safe and considerate', () => {
     const { unmount } = render(<PlayingCard card={card('c1')} index={0} />);
     unmount();
     expect(cancelled).toBe(1);
+  });
+});
+
+describe('a played card flies in from its owner side', () => {
+  /** Reads the starting transform of the most recent animation. */
+  const startTransform = () => String(calls[calls.length - 1]!.keyframes[0]!.transform);
+
+  it('enters from the left for the seat on the left', () => {
+    render(<PlayingCard card={card('c')} played from="left" />);
+    expect(startTransform()).toMatch(/translate\(-\d+px,\s*0px\)/);
+  });
+
+  it('enters from the right for the seat on the right', () => {
+    render(<PlayingCard card={card('c')} played from="right" />);
+    expect(startTransform()).toMatch(/translate\(\d+px,\s*0px\)/);
+  });
+
+  it('drops down from the seat across the table', () => {
+    render(<PlayingCard card={card('c')} played from="top" />);
+    expect(startTransform()).toMatch(/translate\(0px,\s*-\d+px\)/);
+  });
+
+  it('rises from your own seat at the bottom', () => {
+    render(<PlayingCard card={card('c')} played from="bottom" />);
+    expect(startTransform()).toMatch(/translate\(0px,\s*\d+px\)/);
+  });
+
+  it('gives opposite sides opposite directions', () => {
+    render(<PlayingCard card={card('a')} played from="left" />);
+    const left = startTransform();
+    render(<PlayingCard card={card('b')} played from="right" />);
+    expect(startTransform()).not.toBe(left);
+  });
+
+  it('settles square, with no leftover offset or rotation', () => {
+    render(<PlayingCard card={card('c')} played from="left" />);
+    const last = calls[calls.length - 1]!.keyframes.at(-1)!;
+    expect(String(last.transform)).toContain('translate(0, 0)');
+    expect(String(last.transform)).toContain('rotate(0deg)');
+    expect(last.opacity).toBe(1);
+  });
+
+  it('eases through a midpoint so the card reads as thrown, not teleported', () => {
+    render(<PlayingCard card={card('c')} played from="left" />);
+    expect(calls[calls.length - 1]!.keyframes).toHaveLength(3);
+  });
+
+  it('still animates when the origin is unknown', () => {
+    render(<PlayingCard card={card('c')} played />);
+    expect(calls).toHaveLength(1);
+    expect(startTransform()).toMatch(/translate/);
+  });
+
+  it('keeps the flight short enough to stay snappy', () => {
+    render(<PlayingCard card={card('c')} played from="top" />);
+    expect(Number(calls[calls.length - 1]!.options.duration)).toBeLessThanOrEqual(400);
+  });
+});
+
+describe('the seat passes its own direction to the card', () => {
+  it('animates from the seat position, not a fixed direction', () => {
+    const left = { ...seatView('c1'), position: 'left' } as SeatView;
+    render(<TableSeat view={left} teamPlay />);
+    expect(String(calls[0]!.keyframes[0]!.transform)).toMatch(/translate\(-\d+px/);
+  });
+
+  it('uses a different direction for a different seat', () => {
+    const top = { ...seatView('c1'), position: 'top' } as SeatView;
+    render(<TableSeat view={top} teamPlay />);
+    expect(String(calls[0]!.keyframes[0]!.transform)).toMatch(/translate\(0px,\s*-\d+px\)/);
   });
 });

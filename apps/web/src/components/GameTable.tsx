@@ -6,6 +6,7 @@ import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
 import { TableSeat } from './TableSeat.js';
 import { buildSeatViews, turnMessage } from '../table-seats.js';
+import { useTrickHold } from '../useTrickHold.js';
 
 export interface GameTableProps {
   room: RoomView;
@@ -24,7 +25,7 @@ export interface GameTableProps {
 
 export function GameTable({
   room,
-  game,
+  game: liveGame,
   meId,
   chooseSuit,
   play,
@@ -35,6 +36,9 @@ export function GameTable({
   resolveDraw,
   dealReady = true,
 }: GameTableProps) {
+  // A completed trick is held on screen for a few seconds so everyone can see
+  // what was played; the rest of the component treats this as the live view.
+  const game = useTrickHold(liveGame);
   const me = room.players.find((p) => p.id === meId);
   const hakem = room.players.find((p) => p.seat === game.hakemSeat);
   const isMyTurn = me?.seat === game.currentTurnSeat;

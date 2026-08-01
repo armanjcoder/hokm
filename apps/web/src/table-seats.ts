@@ -71,12 +71,14 @@ export function buildSeatViews({ mode, players, game, mySeat }: BuildSeatsOption
 
   // Keyed by plain seat numbers so lookups do not depend on the branded Seat
   // type flowing through unchanged.
-  // Between tricks the current one is already empty, so fall back to the trick
-  // that just finished. Without this the cards vanish the instant the fourth
-  // one lands and nobody can see what actually happened.
-  const resolving = game.currentTrick.plays.length === 0 ? lastCompletedTrick(game) : undefined;
+  // Between tricks the engine has already emptied the current one, so fall back
+  // to the trick that just finished. `useTrickHold` may also have substituted
+  // the completed trick in place of the live one, in which case it arrives here
+  // carrying its own `winnerSeat` and is used directly.
+  const finished = lastCompletedTrick(game);
+  const resolving = game.currentTrick.plays.length === 0 ? finished : undefined;
   const visiblePlays = resolving?.plays ?? game.currentTrick.plays;
-  const winnerSeat = resolving?.winnerSeat;
+  const winnerSeat = resolving?.winnerSeat ?? game.currentTrick.winnerSeat;
 
   const playedBySeat = new Map<number, SeatView['playedCard']>(
     visiblePlays.map((play) => [Number(play.seat), play.card]),

@@ -1,6 +1,7 @@
 import type { Card } from '@hokm/game-engine';
 import { suitMeta } from '../types.js';
 import { useCardEntrance } from '../useCardEntrance.js';
+import type { TablePosition } from '../table-seats.js';
 
 /**
  * A single playing card.
@@ -26,6 +27,8 @@ export function PlayingCard({
    * and only then adds the animation class, which starts the animation.
    */
   dealReady = true,
+  /** Seat this card was played from, so it flies in from that side. */
+  from,
 }: {
   card: Card;
   disabled?: boolean;
@@ -36,6 +39,7 @@ export function PlayingCard({
   index?: number;
   played?: boolean;
   dealReady?: boolean;
+  from?: TablePosition;
 }) {
   const suit = suitMeta(card.suit);
   const label = `${card.rank} ${suit.label}`;
@@ -46,6 +50,7 @@ export function PlayingCard({
     index,
     enabled: played || dealReady,
     replayKey: card.id,
+    ...(from ? { from } : {}),
   });
   const classes = ['card', suit.color, compact && 'compact', selected && 'selected', disabled && 'is-blocked']
     .filter(Boolean)
