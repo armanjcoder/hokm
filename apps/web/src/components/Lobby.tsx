@@ -1,4 +1,5 @@
 import { getModeConfig } from '@hokm/game-engine';
+import { avatarUrl } from '../lib.js';
 import { LobbySeat } from './LobbySeat.js';
 import {
   DIFFICULTY_OPTIONS,
@@ -9,8 +10,10 @@ import {
   type RoomView,
 } from '../types.js';
 
-export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty, removeBot, invite, busy, showRules, updateSettings }: {
+export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty, removeBot, invite, busy, showRules, updateSettings, apiUrl }: {
   room: RoomView;
+  /** Origin the profile photos are proxied from. */
+  apiUrl: string;
   me: RoomPlayer | undefined;
   isHost: boolean;
   toggleReady: () => void;
@@ -145,6 +148,7 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty,
             myTeam={myTeam}
             viewerIsHost={isHost}
             busy={busy}
+            photoUrl={avatarUrl(apiUrl, room.id, player)}
             setBotDifficulty={setBotDifficulty}
             removeBot={removeBot}
           />

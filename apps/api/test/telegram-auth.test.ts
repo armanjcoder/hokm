@@ -113,3 +113,45 @@ describe('telegramDisplayName', () => {
     expect(telegramDisplayName({ id: 1 })).toBeUndefined();
   });
 });
+
+describe('profile photo in initData', () => {
+  it('keeps a Telegram-hosted https photo url', () => {
+    const photo = 'https://t.me/i/userpic/320/abc.jpg';
+    const result = verifyInitData(
+      signInitData(
+        validFields({ user: JSON.stringify({ id: 7, first_name: 'آرمان', photo_url: photo }) }),
+      ),
+      BOT_TOKEN,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.user.photoUrl).toBe(photo);
+  });
+
+  it.each([
+    ['http instead of https', 'http://t.me/i/userpic/320/abc.jpg'],
+    ['a foreign host', 'https://evil.example.com/abc.jpg'],
+    ['a lookalike suffix', 'https://t.me.evil.com/abc.jpg'],
+    ['an internal address', 'https://127.0.0.1:4000/health'],
+    ['embedded credentials', 'https://a:b@t.me/x.jpg'],
+    ['a data url', 'data:image/png;base64,AAAA'],
+    ['nonsense', 'not-a-url'],
+  ])('drops %s even though the signature is valid', (_label, photo) => {
+    const result = verifyInitData(
+      signInitData(
+        validFields({ user: JSON.stringify({ id: 7, first_name: 'آرمان', photo_url: photo }) }),
+      ),
+      BOT_TOKEN,
+    );
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.user.photoUrl).toBeUndefined();
+  });
+
+  it('treats a missing photo as normal, not an error', () => {
+    const result = verifyInitData(signInitData(validFields()), BOT_TOKEN);
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.user.photoUrl).toBeUndefined();
+  });
+});

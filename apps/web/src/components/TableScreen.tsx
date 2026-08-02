@@ -1,10 +1,11 @@
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type { Card, PublicGameView, Suit } from '@hokm/game-engine';
 import type { StoredSession } from '../lib.js';
 import type { BotDifficulty, ConnectionStatus, RoomPlayer, RoomView } from '../types.js';
 import { AbandonedNotice } from './AbandonedNotice.js';
 import { GameTable } from './GameTable.js';
 import { Lobby } from './Lobby.js';
+import { ProfileSheet } from './ProfileSheet.js';
 import { StartOverlay } from './StartOverlay.js';
 import { Toast } from './Toast.js';
 import { TopBar } from './TopBar.js';
@@ -69,6 +70,8 @@ export function TableScreen({
   table: TableHandlers;
   invite: () => void;
 }) {
+  const [profileOpen, setProfileOpen] = useState(false);
+
   return (
     <main className="app-shell">
       <TopBar
@@ -77,6 +80,7 @@ export function TableScreen({
         apiUrl={apiUrl}
         connection={connection}
         showRules={showRules}
+        showProfile={() => setProfileOpen(true)}
         leaveRoom={room.status === 'abandoned' ? undefined : lobby.leaveRoom}
         leaveBusy={lobbyBusy}
       />
@@ -89,6 +93,7 @@ export function TableScreen({
           busy={lobbyBusy}
           invite={invite}
           showRules={showRules}
+          apiUrl={apiUrl}
           toggleReady={lobby.toggleReady}
           addBot={lobby.addBot}
           setBotDifficulty={lobby.setBotDifficulty}
@@ -104,6 +109,7 @@ export function TableScreen({
           room={room}
           game={game}
           meId={session.playerId}
+          apiUrl={apiUrl}
           dealReady={!starting}
           {...table}
         />
@@ -125,6 +131,10 @@ export function TableScreen({
             خروج از میز
           </button>
         </section>
+      )}
+
+      {profileOpen && (
+        <ProfileSheet room={room} me={me} apiUrl={apiUrl} onClose={() => setProfileOpen(false)} />
       )}
 
       {toast && <Toast message={toast} onDismiss={() => setToast('')} />}

@@ -14,10 +14,13 @@ export function TableSeat({
   teamPlay,
   /** Set while the finished trick is sweeping towards the winning seat. */
   sweepTo,
+  photoUrl,
 }: {
   view: SeatView;
   teamPlay: boolean;
   sweepTo?: TablePosition;
+  /** Proxied Telegram photo for this seat, when the player has a public one. */
+  photoUrl?: string | undefined;
 }) {
   const label = seatLabel(view);
   const empty = !view.player;
@@ -58,6 +61,7 @@ export function TableSeat({
           tone={empty ? 'empty' : teamPlay ? (view.isMyTeam ? 'ours' : 'theirs') : 'solo'}
           isBot={Boolean(view.player?.isBot)}
           size="sm"
+          photoUrl={photoUrl}
         />
         <span className="table-seat__meta">
           <strong className="table-seat__name">

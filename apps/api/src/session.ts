@@ -13,6 +13,8 @@ export interface SessionPlayer {
   id: string;
   token?: string;
   isBot?: boolean;
+  /** Telegram photo URL. Server-only, like the token. */
+  photoUrl?: string;
 }
 
 export type SessionCheck =
@@ -60,8 +62,17 @@ export function verifyPlayerSession<T extends SessionPlayer>(
   return { ok: true };
 }
 
-/** Removes secret fields before a value is sent to clients. */
-export function withoutToken<T extends SessionPlayer>(player: T): Omit<T, 'token'> {
-  const { token: _token, ...rest } = player;
-  return rest;
+/**
+ * Removes server-only fields before a value is sent to clients.
+ *
+ * `photoUrl` leaves with the token. It is not a secret in the way a token is,
+ * but it is a direct CDN address that is blocked on the networks most players
+ * use; clients ask the API for the image instead and only need to know whether
+ * one exists, which `hasPhoto` says.
+ */
+export function withoutToken<T extends SessionPlayer>(
+  player: T,
+): Omit<T, 'token' | 'photoUrl'> & { hasPhoto?: true } {
+  const { token: _token, photoUrl, ...rest } = player;
+  return { ...rest, ...(photoUrl ? { hasPhoto: true as const } : {}) };
 }

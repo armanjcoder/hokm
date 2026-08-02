@@ -50,6 +50,7 @@ export const ERROR_MESSAGES_FA: Record<string, string> = {
   PLAYER_NOT_FOUND: 'بازیکن در این میز پیدا نشد.',
   SEAT_NOT_FOUND: 'این صندلی در میز پیدا نشد.',
   NOT_FOUND: 'آدرس درخواستی روی سرور پیدا نشد.',
+  AVATAR_NOT_FOUND: 'عکس پروفایل این بازیکن در دسترس نیست.',
 };
 
 /** Returns the Persian message for an error code, falling back to a Persian default. */

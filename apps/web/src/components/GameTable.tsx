@@ -6,6 +6,7 @@ import { DuelPhasePanels } from './DuelPhasePanels.js';
 import { Score } from './Score.js';
 import { TableSeat } from './TableSeat.js';
 import { TrumpSheet } from './TrumpSheet.js';
+import { avatarUrl } from '../lib.js';
 import { buildSeatViews, drawMessage, teamRosters, turnMessage } from '../table-seats.js';
 import { useTrickHold } from '../useTrickHold.js';
 import { useTrickWonHaptic } from '../useTrickWonHaptic.js';
@@ -27,6 +28,8 @@ export interface GameTableProps {
   dealReady?: boolean;
   /** Tells the server this client finished showing the hakem draw. */
   hakemDrawDone?: () => void;
+  /** Origin the profile photos are proxied from. */
+  apiUrl?: string;
 }
 
 export function GameTable({
@@ -42,6 +45,7 @@ export function GameTable({
   resolveDraw,
   dealReady = true,
   hakemDrawDone,
+  apiUrl = '',
 }: GameTableProps) {
   // A completed trick is held on screen for a few seconds so everyone can see
   // what was played; the rest of the component treats this as the live view.
@@ -156,6 +160,7 @@ export function GameTable({
             key={view.seat}
             view={view}
             teamPlay={config.teamPlay}
+            photoUrl={avatarUrl(apiUrl, room.id, view.player)}
             {...(sweepTarget ? { sweepTo: sweepTarget.position } : {})}
           />
         ))}

@@ -78,6 +78,7 @@ describe('TopBar help button', () => {
         apiUrl="https://x"
         connection="connected"
         showRules={showRules}
+        showProfile={() => {}}
       />,
     );
     const help = screen.getByLabelText('راهنمای قوانین');

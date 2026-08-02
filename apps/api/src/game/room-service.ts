@@ -26,6 +26,7 @@ export function createRoom(
   mode: GameMode = 'classic4',
   targetScore: number = DEFAULT_TARGET_SCORE,
   rules: OptionalRules = DEFAULT_ROOM_RULES,
+  photoUrl?: string,
 ): Room {
   const host: RoomPlayer = {
     id: randomCode(12),
@@ -35,6 +36,7 @@ export function createRoom(
     connected: false,
     ready: false,
     ...(telegramId !== undefined ? { telegramId } : {}),
+    ...(photoUrl ? { photoUrl } : {}),
   };
   const now = new Date().toISOString();
   const room: Room = {
@@ -54,7 +56,12 @@ export function createRoom(
   return room;
 }
 
-export function joinRoom(room: Room, name: string, telegramId?: number): RoomPlayer {
+export function joinRoom(
+  room: Room,
+  name: string,
+  telegramId?: number,
+  photoUrl?: string,
+): RoomPlayer {
   requireNotAbandoned(room);
   touchRoom(room);
 
@@ -63,6 +70,10 @@ export function joinRoom(room: Room, name: string, telegramId?: number): RoomPla
   const existing = telegramId !== undefined ? room.players.find((p) => p.telegramId === telegramId) : undefined;
   if (existing) {
     existing.name = name;
+    // Refresh the photo too: users change it, and an account that removed its
+    // photo must lose the stale one rather than keep showing it forever.
+    if (photoUrl) existing.photoUrl = photoUrl;
+    else delete existing.photoUrl;
     // Issue a fresh token so a reinstalled client can control the seat again.
     existing.token = createPlayerToken();
     if (!room.players.some((p) => p.id === room.hostPlayerId && !p.isBot)) {
@@ -93,6 +104,7 @@ export function joinRoom(room: Room, name: string, telegramId?: number): RoomPla
     connected: false,
     ready: false,
     ...(telegramId !== undefined ? { telegramId } : {}),
+    ...(photoUrl ? { photoUrl } : {}),
   };
   room.players.push(player);
   return player;

@@ -90,13 +90,14 @@
 | رنگ تیم | همیشه **نسبت به بیننده** (سمت خودت بنفش، حریف کهربایی) و هرگز فقط رنگ — همیشه برچسب متنی هم باشد |
 | فیلد آدرس بک‌اند | داخل تلگرام **پنهان** شود؛ فقط در مرورگر ساده لازم است |
 | کنتراست گرادیان | **هر دو سر** گرادیان باید WCAG AA بدهد، نه فقط سر تیره‌تر (تستی این را اجبار می‌کند) |
+| عکس پروفایل تلگرام | فقط از `initData` **امضاشده**؛ URL خام هرگز به کلاینت نمی‌رود، از `TELEGRAM_PROXY_URL` پروکسی می‌شود، و fallback به حروف اول **اجباری** است |
 
 ---
 
 ## ۳) وضعیت فعلی پروژه
 
-**تست‌ها: ۸۹۳ تست، همه سبز** — game-engine ۱۲۲ · api ۲۳۲ · web ۵۳۹
-پوشش مینی‌اپ: **۹۳٪** (کامپوننت‌ها ۹۷.۷٪)
+**تست‌ها: ۹۷۶ تست، همه سبز** — game-engine ۱۲۲ · api ۲۸۳ · web ۵۷۱
+پوشش مینی‌اپ: **۹۳.۴٪** (`Avatar.tsx` و `ProfileSheet.tsx` هر دو ۱۰۰٪)
 `npm run build` ✅ · `npm run typecheck` ✅
 
 **فازهای تمام‌شده**
@@ -126,6 +127,7 @@
   لابی، حذف تاج ممنوعه، پنهان‌کردن فیلد توسعه‌دهنده داخل تلگرام.
 - **فاز ۴.۷** — صیقل نهایی: پوشش تست از ۸۸٪ به ۹۳٪، رفع دو ایراد کنتراست در
   آواتارها، بازبینی RTL.
+- **فاز ۴.۱۲** — پروفایل بازیکن با عکس تلگرام (پایین کامل توضیح داده شده).
 
 **قرعه‌کشی حاکم (اضافه‌شده در فاز ۴.۳)**
 حاکم قبلاً **همیشه صندلی ۰** بود. حالا با کشیدن کارت تا آمدن آس تعیین می‌شود:
@@ -143,7 +145,7 @@ apps/api/src/
   game/      bots.ts  bot-ai.ts  bot-memory.ts  bot-duel.ts  room-service.ts  views.ts
   http/      app.ts  middleware.ts  rooms.routes.ts
   realtime/  broadcast.ts  handlers.ts
-  telegram/  bot.ts  proxy.ts
+  telegram/  bot.ts  proxy.ts  avatar-proxy.ts
   jobs/      cleanup.ts
 
 apps/web/src/
@@ -161,7 +163,7 @@ apps/web/src/
   components/  Landing  Lobby  LobbySeat  Avatar  GameTable  TableSeat
                TrumpSheet  DuelPhasePanels  PlayingCard  Score  TopBar
                StartOverlay  Toast  AbandonedNotice  ResumingScreen
-               RulesGuide  TableScreen  EntryScreen
+               RulesGuide  TableScreen  EntryScreen  ProfileSheet
   styles.css (فقط @import)
     + styles/{tokens,base,shell,landing,lobby,table,overlay,responsive}.css
 
@@ -176,7 +178,8 @@ packages/game-engine/src/
 
 **HTTP**
 `GET /health` · `GET /rooms/:roomId` · `POST /rooms` ·
-`POST /rooms/:roomId/{join,settings,add-bot,bot-difficulty,remove-bot,ready,leave}`
+`POST /rooms/:roomId/{join,settings,add-bot,bot-difficulty,remove-bot,ready,leave}` ·
+`GET /rooms/:roomId/players/:playerId/avatar` (عکس پروفایل، بدون احراز هویت — عمداً)
 
 **Socket.IO — کلاینت به سرور**
 `room:join` · `game:choose_trump` · `game:play_card` · `game:next_hand` ·
@@ -409,3 +412,88 @@ ingress:
 - **۴.۸–۴.۱۱** حالت‌های بارگذاری، دسترس‌پذیری سطح بازی، پایداری بصری، لحن فارسی
 
 نقشه‌ی کامل فاز ۴ با جزئیات در `docs/ROADMAP.md` است.
+
+
+---
+
+## فاز ۴.۱۲ — پروفایل بازیکن با عکس تلگرام
+
+### چرا اصلاً پروکسی؟
+CDN عکس تلگرام (`t.me` / `cdn-telegram.org` / `telesco.pe`) دقیقاً روی همان
+شبکه‌هایی فیلتر است که `api.telegram.org` را می‌بندند. اگر مستقیم در `<img src>`
+می‌گذاشتیم، برای کاربر داخل ایران فقط یک آواتار شکسته بود. پس همان
+`TELEGRAM_PROXY_URL` که برای Bot API داریم دوباره استفاده می‌شود و گوشی فقط با
+origin خودمان حرف می‌زند.
+
+### مسیر داده
+1. `photo_url` از داخل `user` در **`initData` امضاشده** خوانده می‌شود
+   (`parseUser` در `telegram-auth.ts`). `initDataUnsafe` هرگز.
+2. `isAllowedPhotoUrl` آن را فیلتر می‌کند: فقط `https`، فقط هاست‌های تلگرام،
+   بدون credential داخل URL. هر چیز دیگری **دور ریخته می‌شود** حتی اگر امضا درست
+   باشد.
+3. در `RoomPlayer.photoUrl` ذخیره می‌شود — **فقط سمت سرور**.
+4. `withoutToken` آن را مثل token حذف می‌کند و به‌جایش `hasPhoto: true`
+   می‌گذارد. پس URL خام هیچ‌وقت در هیچ snapshot اتاقی serialize نمی‌شود.
+5. کلاینت با `avatarUrl()` در `lib.ts` آدرس **API خودمان** را می‌سازد.
+6. `GET /rooms/:roomId/players/:playerId/avatar` تصویر را از طریق proxy می‌آورد.
+
+### تصمیم‌های امنیتی (هیچ‌کدام تزئینی نیست)
+- **SVG ممنوع.** `ALLOWED_CONTENT_TYPES` فقط jpeg/png/webp/gif است. تصویر
+  same-origin با خود مینی‌اپ سرو می‌شود، پس یک SVG اسکریپت‌دار = XSS ذخیره‌شده.
+- **Redirect دنبال نمی‌شود.** وگرنه مقصد از allow-list فرار می‌کرد.
+- **`content-type` نرمال‌سازی می‌شود** و همان مقدار وتراست‌شده echo می‌شود، نه
+  رشته‌ی خام CDN. به‌علاوه `X-Content-Type-Options: nosniff`.
+- **سقف حجم ۵۱۲KB** با قطع وسط استریم.
+- **allow-list هاست** یعنی این endpoint را نمی‌شود به SSRF تبدیل کرد.
+- **بدون احراز هویت، عمداً**: خروجی عکس عمومی کسی است که همین حالا سر همین میز
+  نشسته، و اجبار به token آن را در `<img>` غیرقابل استفاده می‌کرد.
+
+### کارایی
+- کش درون‌حافظه‌ای با TTL یک ساعت و سقف ۳۰۰ ورودی (LRU).
+- **coalescing**: چهار صندلی میز همزمان یک عکس را می‌خواهند → دقیقاً یک دانلود
+  (`inFlight`). روی شبکه‌ی فیلترشده این تفاوت واقعی است.
+- limiter جدا (`avatarLimiter`) چون مرورگر عکس می‌گیرد نه بازیکن؛ اگر با
+  `lobbyLimiter` مشترک بود، صرفِ نگاه‌کردن به میز می‌توانست دکمه‌ی «آماده»ی
+  خودت را rate-limit کند.
+- timeout هشت‌ثانیه‌ای؛ خطا **کش نمی‌شود** تا CDN که برگشت فوراً کار کند.
+
+### UI
+- `Avatar` عکس را **روی** حروف اول می‌گذارد (`position: absolute; inset: 0`)،
+  نه به‌جای آن. پس اگر عکس ۴۰۴ شود یا شبکه بخوردش، `onError` آن را برمی‌دارد و
+  همان طراحی قبلی زیرش آماده است. چون جعبه در هر دو حالت دقیقاً هم‌اندازه است،
+  **layout shift صفر** است.
+- ورودی پروفایل، خودِ آواتار کاربر در نوار بالا است (`.profile-button`،
+  حداقل ۴۴px، focus ring دارد).
+- `ProfileSheet` از همان پوسته‌ی `rules-sheet` استفاده می‌کند تا زبان بصری دوم
+  ساخته نشود؛ `useFocusTrap` مشترک.
+- متن صادق است و **سه حالت** را از هم جدا می‌کند: مهمانِ بدون تلگرام /
+  تلگرامی با عکس عمومی / تلگرامی بدون عکس عمومی.
+- آمار برد و باخت اینجا **نیست** — آن مال فاز ۶ است.
+
+### تست‌ها (۸۳ تست جدید)
+- `apps/api/test/avatar-proxy.test.ts` (۳۴) — یک سرور **واقعی TLS** بالا می‌آورد
+  با گواهی self-signed برای `cdn.telesco.pe` و HTTPS واقعی حرف می‌زند. mock
+  نیست، چون تمام ارزش این ماژول در رفتار روی سیم است. زمان timeout و تعداد
+  request واقعاً **اندازه‌گیری** می‌شود.
+- `apps/api/test/telegram-auth.test.ts` — پذیرش/رد `photo_url`.
+- `apps/api/test/audit-privacy.test.ts` — URL هرگز نشت نمی‌کند.
+- `apps/api/test/telegram-auth.e2e.test.ts` — endpoint واقعی روی سرور واقعی.
+- `apps/web/test/profile-avatar.test.tsx` (۲۶) — **سه لایه جدا**: helper، خود
+  `Avatar`، و اتصال واقعی در `Lobby` / `GameTable` / `TopBar` / `TableScreen`.
+  لایه‌ی سوم عمدی است: قبلاً باگی زنده ماند چون تست فقط `PlayingCard` را مستقیم
+  می‌سنجید و اتصالش به `TableSeat` را نه.
+- `apps/web/test/design-tokens.test.ts` — اثبات نبودِ layout shift از روی CSS.
+
+### probeهای انجام‌شده (همه تأیید شد که تست قرمز می‌شود)
+۱ حذف `photoUrl` در `TableSeat` · ۲ نشت URL در `withoutToken` ·
+۳ حذف allow-list هاست · ۴ حذف `onError` · ۵ حذف سقف حجم ·
+۶ حذف بررسی content-type · ۷ اجازه‌دادن به SVG · ۸ حذف coalescing.
+
+**نکته‌ی مهم:** probe شماره ۳ اول **صفر خطا** داد در `avatar-proxy.test.ts` —
+یعنی تست ناقص بود، نه کد سالم. تست بازنویسی شد تا با شمارنده‌ی hit ثابت کند
+هیچ connectionی باز نشده؛ بعد از آن probe درست ۱۱ خطا داد.
+
+### چیزی که اثبات نشده
+عکس واقعی از تلگرام واقعی هرگز در این sandbox بارگذاری نشده — نه مرورگر داریم
+نه دسترسی به `t.me`. آنچه اثبات شده رفتار HTTPS واقعی مقابل یک سرور واقعی است.
+**قضاوت نهایی ظاهر با کاربر است.**

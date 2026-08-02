@@ -28,5 +28,9 @@ export function authenticate(initData: string | undefined): Identity {
 
 export function identityFromUser(user: TelegramUser): Identity {
   const name = telegramDisplayName(user);
-  return { telegramId: user.id, ...(name ? { name } : {}) };
+  return {
+    telegramId: user.id,
+    ...(name ? { name } : {}),
+    ...(user.photoUrl ? { photoUrl: user.photoUrl } : {}),
+  };
 }

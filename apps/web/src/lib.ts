@@ -86,3 +86,21 @@ export function parseStoredSession(raw: string | null, fallbackApiUrl: string): 
 export function buildInviteLink(origin: string, pathname: string, roomId: string, apiUrl: string): string {
   return `${origin}${pathname}?room=${encodeURIComponent(roomId)}&api=${encodeURIComponent(apiUrl)}`;
 }
+
+/**
+ * Where to fetch a player's Telegram profile photo.
+ *
+ * The API proxies the image, because Telegram's photo CDN is blocked on many of
+ * the networks this game is played on and a direct `<img src>` would just show a
+ * broken avatar. Returns undefined when the player has no public photo, which is
+ * the normal case for guests and bots.
+ */
+export function avatarUrl(
+  apiUrl: string,
+  roomId: string,
+  player: { id: string; hasPhoto?: boolean | undefined; isBot?: boolean | undefined } | undefined,
+): string | undefined {
+  if (!player?.hasPhoto || player.isBot) return undefined;
+  if (!apiUrl || !roomId) return undefined;
+  return `${normalizeApiUrl(apiUrl)}/rooms/${encodeURIComponent(roomId)}/players/${encodeURIComponent(player.id)}/avatar`;
+}

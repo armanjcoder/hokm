@@ -21,6 +21,9 @@ import { errorBody, localizeErrorCode } from '../messages.js';
 import { emitRoom } from '../realtime/broadcast.js';
 import { nextFreeSeat } from '../room-lifecycle.js';
 import { sanitizeDisplayName } from '../sanitize.js';
+import { withoutToken } from '../session.js';
+import { fetchAvatar } from '../telegram/avatar-proxy.js';
+import { createTelegramProxyAgent } from '../telegram/proxy.js';
 import {
   actorSchema,
   addBotSchema,
@@ -32,7 +35,7 @@ import {
   settingsSchema,
 } from '../schemas.js';
 import { persistRoom, requireRoom, rooms, touchRoom } from '../state.js';
-import { createRoomLimiter, enforceLimit, lobbyLimiter } from './middleware.js';
+import { avatarLimiter, createRoomLimiter, enforceLimit, lobbyLimiter } from './middleware.js';
 
 /** Applies only the rule flags a client actually sent. */
 function mergeRules(
@@ -70,6 +73,7 @@ roomsRouter.post('/rooms', (req, res) => {
     body.mode,
     body.targetScore,
     mergeRules(DEFAULT_ROOM_RULES, body.rules),
+    identity.photoUrl,
   );
   persistRoom(room);
 
@@ -83,12 +87,17 @@ roomsRouter.post('/rooms/:roomId/join', (req, res) => {
   const body = joinRoomSchema.parse(req.body);
   const identity = authenticate(body.initData);
 
-  const player = joinRoom(room, sanitizeDisplayName(identity.name ?? body.name), identity.telegramId);
+  const player = joinRoom(
+    room,
+    sanitizeDisplayName(identity.name ?? body.name),
+    identity.telegramId,
+    identity.photoUrl,
+  );
   maybeStartGame(room);
   persistRoom(room);
   void emitRoom(room);
 
-  return res.json({ room: sanitizeRoom(room), player, token: player.token });
+  return res.json({ room: sanitizeRoom(room), player: withoutToken(player), token: player.token });
 });
 
 // Host-only table settings. Changing the mode resizes the table, so any bots
@@ -223,4 +232,40 @@ roomsRouter.post('/rooms/:roomId/leave', (req, res) => {
   void emitRoom(room);
 
   return res.json({ ok: true, room: sanitizeRoom(room) });
+});
+
+/**
+ * Serves a seated player's Telegram profile photo.
+ *
+ * Fetched server-side rather than linked directly, because Telegram's photo CDN
+ * is blocked on the same networks that block the Bot API — the existing
+ * `TELEGRAM_PROXY_URL` is reused so the image arrives the same way bot traffic
+ * does. Clients only ever see `/rooms/:roomId/players/:playerId/avatar`.
+ *
+ * Deliberately unauthenticated: the response is a public profile picture of
+ * someone already sitting at this table, and requiring a session token would
+ * make it impossible to render in a plain `<img>`. Only players of an existing
+ * room can be addressed, so this cannot enumerate anything.
+ */
+roomsRouter.get('/rooms/:roomId/players/:playerId/avatar', async (req, res, next) => {
+  try {
+    if (!enforceLimit(avatarLimiter, req, res)) return;
+    const room = rooms.get(req.params.roomId);
+    const player = room?.players.find((candidate) => candidate.id === req.params.playerId);
+    if (!player?.photoUrl) return res.status(404).json(errorBody('AVATAR_NOT_FOUND'));
+
+    const image = await fetchAvatar(player.photoUrl, createTelegramProxyAgent(config.telegramProxyUrl));
+    if (!image) return res.status(404).json(errorBody('AVATAR_NOT_FOUND'));
+
+    // Avatars change rarely, and a stale one is harmless, so let the client keep
+    // it: re-fetching through a censored network on every render is expensive.
+    res.setHeader('Cache-Control', 'private, max-age=3600');
+    res.setHeader('Content-Type', image.contentType);
+    res.setHeader('Content-Length', String(image.body.length));
+    // The bytes are an image no matter what the CDN said; stop a sniffed type.
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+    return res.end(image.body);
+  } catch (error) {
+    return next(error);
+  }
 });

@@ -38,6 +38,7 @@ const ALLOWED_PLAYER_KEYS = new Set([
   'isBot',
   'difficulty',
   'telegramId',
+  'hasPhoto',
 ]);
 
 function tableOfTwo() {
@@ -96,5 +97,41 @@ describe('game state never leaks private cards', () => {
     const view = sanitizeRoom(room) as any;
     expect(view.game?.hands).toBeUndefined();
     expect(view.game?.stock).toBeUndefined();
+  });
+});
+
+describe('telegram photo urls never leave the server', () => {
+  const PHOTO = 'https://t.me/i/userpic/320/secret.jpg';
+
+  function roomWithPhoto() {
+    const room = createRoom('Host', 111111, 'classic4', undefined, undefined, PHOTO);
+    joinRoom(room, 'Guest', 222222);
+    return room;
+  }
+
+  it('replaces the url with a boolean flag in the public view', () => {
+    const view = sanitizeRoom(roomWithPhoto()) as any;
+    const host = view.players.find((p: any) => p.name === 'Host');
+    expect(host.hasPhoto).toBe(true);
+    expect(host.photoUrl).toBeUndefined();
+  });
+
+  it('never serialises the url anywhere in a room snapshot', () => {
+    expect(JSON.stringify(sanitizeRoom(roomWithPhoto()))).not.toContain('userpic');
+    expect(JSON.stringify(sanitizeRoom(roomWithPhoto()))).not.toContain('photoUrl');
+  });
+
+  it('omits the flag entirely for players without a photo', () => {
+    const view = sanitizeRoom(roomWithPhoto()) as any;
+    const guest = view.players.find((p: any) => p.name === 'Guest');
+    expect('hasPhoto' in guest).toBe(false);
+  });
+
+  it('drops a stale photo when the player rejoins without one', () => {
+    const room = createRoom('Host', 111111, 'classic4', undefined, undefined, PHOTO);
+    joinRoom(room, 'Host', 111111);
+    expect(room.players[0]!.photoUrl).toBeUndefined();
+    const view = sanitizeRoom(room) as any;
+    expect(view.players[0].hasPhoto).toBeUndefined();
   });
 });

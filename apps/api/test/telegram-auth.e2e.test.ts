@@ -159,3 +159,48 @@ describe('guest mode when no bot token is configured', () => {
     expect(body.players[0].telegramId).toBeUndefined();
   });
 });
+
+describe('avatar endpoint end to end', () => {
+  const PHOTO_USER = { id: 333333, first_name: 'عکس‌دار', photo_url: 'https://t.me/i/userpic/320/z.jpg' };
+  const SPOOF_USER = { id: 444444, first_name: 'جعلی', photo_url: 'http://127.0.0.1:9/secret' };
+
+  it('advertises hasPhoto without ever revealing the CDN url', async () => {
+    const created = await post('/rooms', { hostName: 'x', initData: signInitData(PHOTO_USER) });
+    expect(created.status).toBe(201);
+    expect(created.body.players[0].hasPhoto).toBe(true);
+    expect(JSON.stringify(created.body)).not.toContain('userpic');
+
+    // The join response returns the player object directly; it must be sanitised too.
+    const joined = await post(`/rooms/${created.body.id}/join`, {
+      name: 'x',
+      initData: signInitData(PHOTO_USER),
+    });
+    expect(JSON.stringify(joined.body)).not.toContain('userpic');
+  });
+
+  it('refuses a photo url that is not Telegram-hosted, even when signed', async () => {
+    const created = await post('/rooms', { hostName: 'x', initData: signInitData(SPOOF_USER) });
+    expect(created.status).toBe(201);
+    // Signature was valid, so the seat exists; the URL was still thrown away.
+    expect(created.body.players[0].hasPhoto).toBeUndefined();
+
+    const playerId = created.body.players[0].id;
+    const response = await fetch(`${server.url}/rooms/${created.body.id}/players/${playerId}/avatar`);
+    expect(response.status).toBe(404);
+  });
+
+  it('404s for an unknown room or player instead of erroring', async () => {
+    const missingRoom = await fetch(`${server.url}/rooms/nope/players/nobody/avatar`);
+    expect(missingRoom.status).toBe(404);
+    expect((await missingRoom.json()).error).toBe('AVATAR_NOT_FOUND');
+  });
+
+  it('404s rather than hanging when the Telegram CDN is unreachable', async () => {
+    const created = await post('/rooms', { hostName: 'x', initData: signInitData(PHOTO_USER) });
+    const playerId = created.body.players[0].id;
+    const response = await fetch(`${server.url}/rooms/${created.body.id}/players/${playerId}/avatar`);
+    // The sandbox cannot reach t.me, which is exactly the censored-network case:
+    // the endpoint must answer, not stall the request.
+    expect(response.status).toBe(404);
+  }, 30000);
+});

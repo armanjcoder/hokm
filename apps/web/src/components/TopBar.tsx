@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { avatarUrl } from '../lib.js';
+import { initialsFor } from '../table-seats.js';
 import { CONNECTION_LABELS, type ConnectionStatus, type RoomPlayer, type RoomView } from '../types.js';
+import { Avatar } from './Avatar.js';
 
 export function TopBar({
   room,
@@ -7,6 +10,7 @@ export function TopBar({
   apiUrl,
   connection,
   showRules,
+  showProfile,
   leaveRoom,
   leaveBusy = false,
 }: {
@@ -15,6 +19,8 @@ export function TopBar({
   apiUrl: string;
   connection: ConnectionStatus;
   showRules: () => void;
+  /** Opens the player's own profile card. */
+  showProfile: () => void;
   /** Omitted on screens where leaving is not possible. */
   leaveRoom?: (() => void) | undefined;
   leaveBusy?: boolean | undefined;
@@ -118,7 +124,23 @@ export function TopBar({
           </div>
         )}
         <span className={`api-dot ${connection}`} title={`${CONNECTION_LABELS[connection]} — ${apiUrl}`} />
-        <div className="pill">{me ? `صندلی ${me.seat + 1}` : 'تماشاچی'}</div>
+        {/* The player's own avatar is the profile entry point: it is already the
+            thing that represents them everywhere else, so it needs no label of
+            its own beyond the accessible name. */}
+        <button
+          className="profile-button"
+          type="button"
+          aria-label={me ? `پروفایل ${me.name}` : 'پروفایل من'}
+          onClick={showProfile}
+        >
+          <Avatar
+            initials={initialsFor(me?.name, me?.seat ?? 0)}
+            tone="ours"
+            size="sm"
+            photoUrl={avatarUrl(apiUrl, room.id, me)}
+          />
+          <span className="profile-button__seat">{me ? `صندلی ${me.seat + 1}` : 'تماشاچی'}</span>
+        </button>
       </div>
       {connection !== 'connected' && (
         <div className={`connection-banner ${connection}`} role="status">

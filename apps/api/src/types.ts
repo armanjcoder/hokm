@@ -8,6 +8,12 @@ export interface RoomPlayer {
   token?: string;
   name: string;
   telegramId?: number;
+  /**
+   * Telegram profile photo URL from verified `initData`. Server-only: it is
+   * stripped from every client view and reached through the avatar endpoint
+   * instead, so the CDN address never leaves the machine.
+   */
+  photoUrl?: string;
   seat: Seat;
   connected: boolean;
   ready?: boolean;
@@ -37,4 +43,6 @@ export interface Room {
 export interface Identity {
   telegramId?: number;
   name?: string;
+  /** Verified Telegram profile photo, when the account has a public one. */
+  photoUrl?: string;
 }

@@ -14,6 +14,12 @@ export interface RoomPlayer {
   id: string;
   name: string;
   telegramId?: number;
+  /**
+   * True when this player signed in from Telegram with a public profile photo.
+   * The URL itself never leaves the server; ask the API for the image with
+   * `avatarUrl()`.
+   */
+  hasPhoto?: boolean;
   seat: number;
   connected: boolean;
   ready?: boolean;

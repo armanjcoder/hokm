@@ -18,6 +18,40 @@ export interface TelegramUser {
   firstName?: string;
   lastName?: string;
   username?: string;
+  /**
+   * Public profile photo, present only when the user has one and their privacy
+   * settings allow it. Telegram simply omits the field otherwise, so an absent
+   * value is normal and must never be treated as an error.
+   */
+  photoUrl?: string;
+}
+
+/**
+ * Hosts a Telegram profile photo may be served from.
+ *
+ * `photo_url` arrives inside signed data, so it cannot be forged by a random
+ * client — but the bot token holder is not the only party who ever touches this
+ * value (test fixtures, future stored snapshots, a leaked token). Restricting
+ * the host means the avatar proxy can never be pointed at an internal address,
+ * which turns a signature problem into an SSRF hole.
+ */
+const PHOTO_HOST_SUFFIXES = ['.telegram.org', '.cdn-telegram.org', '.telesco.pe'];
+const PHOTO_HOSTS = ['telegram.org', 't.me', 'cdn.telesco.pe'];
+
+/** True when a URL is an https Telegram-hosted image we are willing to fetch. */
+export function isAllowedPhotoUrl(raw: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(raw);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== 'https:') return false;
+  // Credentials in the URL would let the host be spoofed past a naive reader.
+  if (url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  if (PHOTO_HOSTS.includes(host)) return true;
+  return PHOTO_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix));
 }
 
 export type InitDataFailure =
@@ -89,13 +123,19 @@ function parseUser(raw: string | null): TelegramUser | undefined {
       first_name?: unknown;
       last_name?: unknown;
       username?: unknown;
+      photo_url?: unknown;
     };
     if (typeof parsed.id !== 'number' || !Number.isFinite(parsed.id)) return undefined;
+    const photoUrl =
+      typeof parsed.photo_url === 'string' && isAllowedPhotoUrl(parsed.photo_url)
+        ? parsed.photo_url
+        : undefined;
     return {
       id: parsed.id,
       ...(typeof parsed.first_name === 'string' ? { firstName: parsed.first_name } : {}),
       ...(typeof parsed.last_name === 'string' ? { lastName: parsed.last_name } : {}),
       ...(typeof parsed.username === 'string' ? { username: parsed.username } : {}),
+      ...(photoUrl ? { photoUrl } : {}),
     };
   } catch {
     return undefined;

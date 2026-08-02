@@ -358,3 +358,58 @@ label {
 .room-id-row .room-id {
   margin-bottom: 0;
 }
+
+/* Profile sheet. Reuses the rules sheet shell; only the identity block and the
+   fact list are specific to it. */
+.profile-sheet__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+.profile-sheet__identity h2 {
+  margin: 0;
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+}
+
+.profile-sheet__role {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+}
+
+.profile-sheet__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+}
+
+.profile-sheet__facts > div {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  background: var(--surface-2);
+  border: 1px solid var(--surface-3);
+}
+
+.profile-sheet__facts dt {
+  margin: 0;
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+}
+
+.profile-sheet__facts dd {
+  margin: var(--space-1) 0 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.profile-sheet__note {
+  margin: 0 0 var(--space-4);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+  color: var(--text-secondary);
+}

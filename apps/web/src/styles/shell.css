@@ -100,6 +100,38 @@
   font-weight: 700;
 }
 
+/* Profile entry point in the top bar. Keeps the old seat pill's look so the
+   header does not gain a new visual element, but the whole thing is now the
+   touch target and it clears the 44px minimum in height. */
+.profile-button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: var(--space-1) var(--space-3) var(--space-1) var(--space-1);
+  border-radius: var(--radius-pill);
+  background: rgba(124, 92, 255, 0.18);
+  border: 1px solid transparent;
+  color: var(--violet-100);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.profile-button:hover {
+  background: rgba(124, 92, 255, 0.28);
+}
+
+.profile-button:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.profile-button__seat {
+  white-space: nowrap;
+}
+
 .panel,
 .glass {
   border: 1px solid var(--surface-3);
@@ -311,6 +343,24 @@
   /* Both gradient stops have to clear WCAG AA against the initials. The
      original pairing measured 2.4:1, which is unreadable. */
   background: linear-gradient(140deg, var(--violet-600), var(--mint-900));
+  /* Anchors the photo overlay and clips it to the circle. */
+  position: relative;
+  overflow: hidden;
+}
+
+/* Telegram profile photo, laid over the initials rather than replacing them:
+   if it 404s or the network eats it, the initials are already behind it and
+   the box never changes size, so nothing on the page shifts. */
+.avatar__photo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+  /* A real photo has no idea what is behind it, so give it its own opaque
+     backdrop; a transparent PNG would otherwise show the initials through. */
+  background: var(--surface-2);
 }
 
 .avatar--sm {

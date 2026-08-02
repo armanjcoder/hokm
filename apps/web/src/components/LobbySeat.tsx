@@ -20,6 +20,7 @@ export function LobbySeat({
   myTeam,
   viewerIsHost,
   busy,
+  photoUrl,
   setBotDifficulty,
   removeBot,
 }: {
@@ -35,6 +36,8 @@ export function LobbySeat({
   /** The viewer created the table, so may manage bots. */
   viewerIsHost: boolean;
   busy: boolean;
+  /** Proxied Telegram photo for this seat, when the player has a public one. */
+  photoUrl?: string | undefined;
   setBotDifficulty: (botId: string, difficulty: BotDifficulty) => void;
   removeBot: (botId: string) => void;
 }) {
@@ -71,6 +74,7 @@ export function LobbySeat({
           initials={initialsFor(player?.name, seat)}
           tone={empty ? 'empty' : teamPlay ? (myTeam ? 'ours' : 'theirs') : 'solo'}
           isBot={Boolean(player?.isBot)}
+          photoUrl={photoUrl}
         />
         <span className="seat-card__identity">
           <strong className="seat-card__name">{player ? player.name : 'در انتظار بازیکن…'}</strong>

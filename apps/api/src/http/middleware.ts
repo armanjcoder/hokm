@@ -18,6 +18,20 @@ export const lobbyLimiter = new RateLimiter({
   max: config.rateLimits.actionsPerMinute,
 });
 
+/**
+ * Separate budget for profile photos.
+ *
+ * Avatars are fetched by the browser, not by the player: one table view asks
+ * for up to four at once. Sharing the lobby budget would mean simply looking at
+ * a full table could rate-limit your own ready button, which is absurd. The
+ * allowance is generous because responses are cached both in the server and by
+ * the browser, so a well-behaved client asks once an hour.
+ */
+export const avatarLimiter = new RateLimiter({
+  windowMs: 60_000,
+  max: Math.max(60, config.rateLimits.actionsPerMinute * 4),
+});
+
 export function corsOriginHandler(
   origin: string | undefined,
   callback: (err: Error | null, allow?: boolean) => void,

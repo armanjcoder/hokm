@@ -569,3 +569,57 @@ describe('gradient backgrounds are readable end to end', () => {
     expectAllStopsReadable('.avatar--theirs', 'card-black');
   });
 });
+
+describe('profile photo cannot shift the layout or leak through', () => {
+  const shell = read(path.join(stylesDir, 'shell.css'));
+
+  function rule(selector: string): string {
+    const at = shell.indexOf(`${selector} {`);
+    expect(at, `${selector} should exist`).toBeGreaterThan(-1);
+    return shell.slice(at, shell.indexOf('}', at));
+  }
+
+  it('takes the avatar out of flow so an arriving image never resizes anything', () => {
+    // The bubble already has a fixed width/height per size; the photo is absolutely
+    // positioned inside it, so the box is identical before and after the load.
+    const photo = rule('.avatar__photo');
+    expect(photo).toMatch(/position:\s*absolute/);
+    expect(photo).toMatch(/inset:\s*0/);
+  });
+
+  it('crops rather than stretches a non-square photo', () => {
+    expect(rule('.avatar__photo')).toMatch(/object-fit:\s*cover/);
+  });
+
+  it('gives the photo an opaque backdrop so initials cannot show through a transparent PNG', () => {
+    expect(rule('.avatar__photo')).toMatch(/background:\s*var\(--surface-2\)/);
+  });
+
+  it('clips the photo to the circle', () => {
+    expect(rule('.avatar')).toMatch(/overflow:\s*hidden/);
+    expect(rule('.avatar')).toMatch(/position:\s*relative/);
+  });
+
+  it('keeps every avatar size explicitly sized, so no size can collapse', () => {
+    for (const size of ['sm', 'md', 'lg']) {
+      const body = rule(`.avatar--${size}`);
+      expect(body, `.avatar--${size} needs a width`).toMatch(/width:\s*\d+px/);
+      expect(body, `.avatar--${size} needs a height`).toMatch(/height:\s*\d+px/);
+    }
+  });
+});
+
+describe('profile button is a real touch target', () => {
+  const shell = read(path.join(stylesDir, 'shell.css'));
+  const body = shell.slice(shell.indexOf('.profile-button {'), shell.indexOf('}', shell.indexOf('.profile-button {')));
+
+  it('clears the 44px minimum touch height', () => {
+    const min = Number(body.match(/min-height:\s*(\d+)px/)?.[1] ?? 0);
+    expect(min).toBeGreaterThanOrEqual(44);
+  });
+
+  it('has a visible keyboard focus ring', () => {
+    const focus = shell.slice(shell.indexOf('.profile-button:focus-visible'));
+    expect(focus.slice(0, focus.indexOf('}'))).toMatch(/outline:\s*2px solid var\(--focus-ring\)/);
+  });
+});

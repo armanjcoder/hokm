@@ -35,6 +35,7 @@ function renderBar(over: Partial<Parameters<typeof TopBar>[0]> = {}) {
       apiUrl="https://api.test"
       connection="connected"
       showRules={noop}
+      showProfile={noop}
       leaveRoom={leaveRoom}
       {...over}
     />,
@@ -143,6 +144,7 @@ describe('leave control', () => {
         apiUrl="https://api.test"
         connection="connected"
         showRules={noop}
+        showProfile={noop}
       />,
     );
     expect(screen.queryByRole('button', { name: 'خروج از میز' })).toBeNull();
@@ -157,6 +159,7 @@ describe('leave control', () => {
         apiUrl="https://api.test"
         connection="connected"
         showRules={noop}
+        showProfile={noop}
         leaveRoom={leaveRoom}
       />,
     );
