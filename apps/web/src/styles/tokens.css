@@ -1,0 +1,168 @@
+/**
+ * Design tokens.
+ *
+ * Every colour, space, radius, shadow and duration in the app resolves to a
+ * value declared here. Nothing downstream should hard-code a hex value: that is
+ * how `#00d4aa` ended up duplicated across seven files and became impossible to
+ * retune.
+ *
+ * The palette is deliberately fixed to a dark violet theme. The Mini App never
+ * follows the Telegram light theme, because a card table reads badly on white
+ * and the user asked for dark only.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* ---- Brand palette -------------------------------------------------- */
+  /* Violet carries the identity; mint is the single accent for "your turn",
+     confirmation and anything the player should act on. */
+  --violet-050: #cfc4ff;
+  --violet-100: #e7e2ff;
+  --violet-300: #b9a9ff;
+  --violet-400: #9d86ff;
+  --violet-500: #7d5cff;
+  --violet-600: #6544e0;
+  --violet-700: #4f34b8;
+  --violet-900: #1a1030;
+
+  --mint-100: #d8f7ee;
+  --mint-200: #9df0dc;
+  --mint-300: #6ee7c4;
+  --mint-400: #2fd9b0;
+  --mint-500: #00d4aa;
+  --mint-600: #37e0b6;
+  --mint-700: #00b894;
+  --mint-900: #05131a;
+
+  --rose-200: #ff6b8a;
+  --rose-300: #ff9db0;
+  --rose-500: #ff5470;
+  --amber-200: #fff3b0;
+  --amber-300: #ffd98a;
+  --amber-500: #ffc857;
+  --amber-600: #e0952b;
+
+  /* ---- Surfaces ------------------------------------------------------- */
+  /* A single ramp from the page background up to the most raised card, so
+     depth stays consistent instead of being invented per component. */
+  --bg-base: #07070c;
+  --bg-deep: #080810;
+  --bg-deepest: #08080d;
+  --bg-raised: #11111d;
+  --surface-1: rgba(255, 255, 255, 0.055);
+  --surface-2: rgba(255, 255, 255, 0.08);
+  --surface-3: rgba(255, 255, 255, 0.12);
+  --surface-inset: rgba(0, 0, 0, 0.32);
+
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --border-strong: rgba(255, 255, 255, 0.18);
+
+  /* ---- Text ----------------------------------------------------------- */
+  /* Contrast against --bg-base, measured by test/design-tokens.test.ts:
+     primary 18.8:1, secondary 11.6:1, muted 7.3:1. All clear WCAG AA (4.5:1),
+     and the first two clear AAA (7:1). */
+  --text-primary: #f7f7fb;
+  --text-secondary: #c3c3d4;
+  --text-muted: #9a9ab0;
+  --text-on-accent: #05131a;
+  --text-on-light: #0b0b12;
+  --text-white: #ffffff;
+  --text-bright: #e8e8f2;
+
+  /* ---- Semantic roles ------------------------------------------------- */
+  --accent: var(--mint-500);
+  --accent-strong: var(--mint-400);
+  --accent-text: var(--mint-200);
+  --focus-ring: var(--violet-400);
+  --danger: var(--rose-500);
+  --danger-text: var(--rose-300);
+  --warning: var(--amber-500);
+  --warning-text: var(--amber-300);
+
+  /* Playing card faces stay near-white in every theme: a card must read as a
+     card, and the red/black suit distinction is part of the game's rules. */
+  --card-face: #ffffff;
+  --card-face-edge: #dcdce8;
+  --card-red: #e11d48;
+  --card-black: #111827;
+
+  /* ---- Spacing (4px base) --------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* ---- Radii ----------------------------------------------------------- */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-2xl: 32px;
+  --radius-pill: 999px;
+
+  /* ---- Elevation ------------------------------------------------------- */
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 14px 28px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 24px 56px rgba(0, 0, 0, 0.42);
+  --shadow-accent: 0 12px 30px rgba(0, 212, 170, 0.28);
+
+  /* ---- Typography ------------------------------------------------------ */
+  /* Vazirmatn is bundled with the app. The fallbacks are fonts that actually
+     ship with Windows, macOS, Android and iOS and carry Persian glyphs, so a
+     failed font load degrades to something readable rather than to Times. */
+  --font-fa:
+    'Vazirmatn Variable', 'Vazirmatn', 'Segoe UI', Tahoma, 'Iranian Sans',
+    'IRANSans', 'Noto Naskh Arabic', ui-sans-serif, system-ui, sans-serif;
+
+  --text-xs: 12px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-md: 17px;
+  --text-lg: 20px;
+  --text-xl: 26px;
+  --text-2xl: 32px;
+
+  --leading-tight: 1.25;
+  --leading-normal: 1.6;
+  --leading-loose: 1.8;
+
+  /* ---- Motion ---------------------------------------------------------- */
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-fast: 140ms;
+  --duration-base: 220ms;
+  --duration-slow: 380ms;
+
+  /* ---- Layering -------------------------------------------------------- */
+  /* Named so a new overlay never has to guess a z-index. */
+  --z-hand: 2;
+  --z-picker: 5;
+  --z-result: 6;
+  --z-toast: 10;
+  --z-overlay: 50;
+
+  /* ---- Layout ---------------------------------------------------------- */
+  --shell-max: 980px;
+  --tap-target: 44px;
+
+  /**
+   * Usable height.
+   *
+   * Inside the Telegram in-app browser `dvh` is unreliable, so `telegram.ts`
+   * publishes the host's own stable viewport as `--tg-viewport` and this
+   * prefers it. Outside Telegram the variable is never set and the fallback
+   * chain applies.
+   */
+  --app-height: var(--tg-viewport, 100dvh);
+
+  /* Safe areas for notched phones. Fall back to 0 where unsupported. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+}

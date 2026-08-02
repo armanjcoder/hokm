@@ -2,13 +2,30 @@
 <html lang="fa" dir="rtl">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
-    <meta name="theme-color" content="#09090f" />
+    <!--
+      `viewport-fit=cover` is required for `env(safe-area-inset-*)` to report a
+      real value; without it the notch padding silently resolves to 0.
+      `maximum-scale` is deliberately omitted so pinch zoom keeps working.
+    -->
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#07070c" />
+    <meta name="color-scheme" content="dark" />
     <title>Hokm Club</title>
+    <!-- Replaced at build time with the hashed font filename. -->
+    <!--persian-font-preload-->
   </head>
   <body>
-    <div id="root"></div>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <div id="root">
+      <!-- Replaced by React on mount. Guarantees the user sees something
+           immediately, even while the Telegram SDK is still being fetched. -->
+      <div class="boot-splash">
+        <div class="boot-splash__mark">♠</div>
+        <p class="boot-splash__text">در حال بارگذاری حکم…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

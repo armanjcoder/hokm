@@ -1,0 +1,246 @@
+/* Lobby: seats, readiness and host controls. */
+
+.seat-card.ready {
+  border-color: rgba(0, 212, 170, 0.45);
+  background: linear-gradient(145deg, rgba(0, 212, 170, 0.14), var(--surface-1));
+}
+
+.seat-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  min-height: 24px;
+}
+
+.seat-status.is-ready {
+  color: var(--mint-300);
+}
+
+.host-tag {
+  margin-inline-start: var(--space-2);
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.seat-remove {
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid rgba(255, 84, 112, 0.35);
+  border-radius: var(--radius-pill);
+  background: rgba(255, 84, 112, 0.12);
+  color: var(--danger-text);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background var(--duration-fast) var(--ease-out);
+}
+
+.seat-remove:hover {
+  background: rgba(255, 84, 112, 0.2);
+}
+
+.ready-status {
+  margin: var(--space-3) 0 var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.ready-button {
+  width: 100%;
+  padding: var(--space-4);
+  margin-bottom: var(--space-3);
+  min-height: var(--tap-target);
+  border: 0;
+  border-radius: var(--radius-xl);
+  font-size: var(--text-md);
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--text-on-accent);
+  background: linear-gradient(135deg, var(--accent), var(--mint-600));
+  box-shadow: var(--shadow-accent);
+  transition: transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.ready-button:active {
+  transform: scale(0.98);
+}
+
+.ready-button.is-ready {
+  color: var(--mint-100);
+  background: rgba(0, 212, 170, 0.16);
+  border: 1px solid rgba(0, 212, 170, 0.45);
+  box-shadow: none;
+}
+
+.ghost.danger {
+  color: var(--danger-text);
+  border-color: rgba(255, 84, 112, 0.35);
+}
+
+.hint {
+  margin-top: var(--space-2);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.table-settings {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-xl);
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+}
+
+.table-settings h3 {
+  margin: 0 0 2px;
+  font-size: var(--text-base);
+}
+
+.settings-label {
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+}
+
+.settings-hint {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.rule-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  cursor: pointer;
+}
+
+.rule-toggle input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--accent);
+  flex: 0 0 auto;
+}
+
+.rule-toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.rule-toggle strong {
+  font-size: var(--text-sm);
+}
+
+.rule-toggle small {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.bot-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.bot-difficulty {
+  padding: 3px var(--space-1);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-primary);
+  font-size: var(--text-xs);
+}
+
+.bot-difficulty:disabled {
+  opacity: 0.55;
+}
+
+.add-bot-row {
+  display: grid;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+}
+
+.add-bot-buttons {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.add-bot-buttons .test-bots-button {
+  margin-top: 0;
+  font-size: var(--text-sm);
+  padding: var(--space-3) var(--space-1);
+}
+
+/* A lobby chair. Reads top to bottom: who, then their state. */
+.seat-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.seat-card__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.seat-card__name {
+  font-size: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-card__tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tag--host {
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.tag--bot {
+  background: rgba(157, 134, 255, 0.18);
+  color: var(--violet-100);
+}
+
+/* A tinted edge on the viewer's own side, so partners are obvious before the
+   hand even starts. Colour never carries the meaning alone: the "یار" tag
+   spells it out too. */
+.seat-card.team-ours {
+  border-color: rgba(157, 134, 255, 0.4);
+}
+
+.seat-card.team-theirs {
+  border-color: rgba(255, 200, 87, 0.28);
+}
+
+.seat-card.is-empty {
+  border-style: dashed;
+}
+
+.seat-card.is-empty .seat-card__name {
+  color: var(--text-muted);
+  font-weight: 600;
+}

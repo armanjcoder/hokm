@@ -22,13 +22,13 @@ afterEach(() => {
 describe('SqliteRoomStore', () => {
   it('persists and reloads room snapshots', async () => {
     const dbPath = tempDbPath();
-    const room: PersistableRoom = {
+    const room = {
       id: 'room_1',
       code: 'ABCDE',
       status: 'lobby',
       createdAt: '2026-07-30T00:00:00.000Z',
       players: [{ id: 'p1', name: 'آرمان', seat: 0, connected: true }],
-    };
+    } satisfies PersistableRoom & { players: unknown[] };
 
     const firstStore = await SqliteRoomStore.open(dbPath);
     firstStore.saveRoom(room);

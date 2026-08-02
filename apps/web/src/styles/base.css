@@ -1,0 +1,141 @@
+/* Resets, document shell and shared primitives. */
+
+:root {
+  font-family: var(--font-fa);
+  color: var(--text-primary);
+  background: var(--bg-base);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: var(--app-height);
+  overflow-x: hidden;
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(125, 92, 255, 0.34), transparent 30%),
+    radial-gradient(circle at 90% 0%, rgba(0, 212, 170, 0.18), transparent 26%),
+    linear-gradient(145deg, var(--bg-deep), var(--bg-raised) 52%, var(--bg-deepest));
+  background-attachment: fixed;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  font-family: var(--font-fa);
+}
+
+button {
+  border: 0;
+  cursor: pointer;
+  color: inherit;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.42;
+}
+
+input {
+  width: 100%;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
+  background: var(--surface-2);
+  border-radius: var(--radius-lg);
+  padding: var(--space-3) var(--space-4);
+  outline: none;
+  transition: border-color var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+input:focus {
+  border-color: rgba(157, 134, 255, 0.8);
+  box-shadow: 0 0 0 4px rgba(131, 113, 255, 0.14);
+}
+
+/* Keyboard users must always be able to see where they are. `:focus-visible`
+   keeps the ring off mouse and touch taps, so it costs the pointer UI nothing. */
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+summary:focus-visible,
+a:focus-visible,
+[role='radio']:focus-visible,
+[tabindex]:focus-visible {
+  outline: 3px solid var(--focus-ring);
+  outline-offset: 3px;
+  border-radius: var(--radius-md);
+}
+
+/* Boot splash: lives in index.html and is replaced the moment React mounts.
+   Keeps the screen alive while the Telegram SDK is being fetched. */
+.boot-splash {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-3);
+}
+
+.boot-splash__mark {
+  width: 62px;
+  height: 62px;
+  display: grid;
+  place-content: center;
+  font-size: var(--text-2xl);
+  border-radius: var(--radius-xl);
+  color: var(--violet-100);
+  background: linear-gradient(140deg, rgba(126, 87, 255, 0.55), rgba(0, 190, 160, 0.35));
+  box-shadow: var(--shadow-lg);
+  animation: boot-splash-pulse 1.4s var(--ease-in-out) infinite;
+}
+
+.boot-splash__text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
+@keyframes boot-splash-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.85;
+  }
+  50% {
+    transform: scale(1.07);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash__mark {
+    animation: none;
+  }
+
+  /* Safety net: any animation or transition added later is covered too. */
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

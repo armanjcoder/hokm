@@ -1,0 +1,787 @@
+/* Game table: score strip, played cards, hand and trump picker. */
+
+.table-wrap {
+  position: relative;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 92px);
+  min-height: calc(var(--app-height) - 92px);
+  gap: var(--space-3);
+}
+
+.score-strip {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 1fr;
+  gap: var(--space-2);
+}
+
+.score,
+.round-info {
+  border: 1px solid var(--border-subtle);
+  background: var(--surface-1);
+  border-radius: var(--radius-xl);
+  padding: var(--space-3);
+  text-align: center;
+}
+
+.score {
+  display: grid;
+  gap: 2px;
+}
+
+.score small,
+.score span,
+.round-info small {
+  color: var(--text-muted);
+}
+
+.score strong,
+.round-info strong {
+  font-size: var(--text-xl);
+}
+
+/* Your own side is tinted to match the violet seat badges on the table, so the
+   score strip and the ring agree on which side is which. */
+.score--ours {
+  border-color: rgba(157, 134, 255, 0.4);
+  background: rgba(124, 92, 255, 0.12);
+}
+
+.score__members {
+  display: block;
+  margin-top: 2px;
+  font-style: normal;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.round-info {
+  display: grid;
+  place-items: center;
+  gap: 2px;
+}
+
+/* The table itself: a ring of seats around a central turn indicator.
+   CSS grid areas keep the arrangement declarative, so a 2, 3 or 4 seat table
+   is a different template rather than different markup. */
+.table-center {
+  flex: 1;
+  min-height: 300px;
+  border-radius: var(--radius-2xl);
+  border: 1px solid var(--border-subtle);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(0, 184, 148, 0.16), transparent 62%),
+    linear-gradient(160deg, rgba(124, 92, 255, 0.1), rgba(255, 255, 255, 0.03));
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  align-items: center;
+  justify-items: center;
+  grid-template-areas:
+    '.    top   .'
+    'left core  right'
+    '.    bottom .';
+  grid-template-columns: 1fr minmax(0, 1.1fr) 1fr;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  /* Cards travel across seat boundaries while landing. */
+  overflow: visible;
+}
+
+/* Two player: nobody sits left or right, so give the core the full width. */
+.table-center.seats-2 {
+  grid-template-areas:
+    'top'
+    'core'
+    'bottom';
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.table-center__core {
+  grid-area: core;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-2);
+  text-align: center;
+  /* Holds its own size so the ring around it never shifts. */
+  min-height: 96px;
+}
+
+.table-event {
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  max-width: 22ch;
+  /* Reserve two lines so the ring does not jump as the message changes. */
+  min-height: calc(var(--text-xs) * var(--leading-normal) * 2);
+}
+
+.table-seat {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  padding: var(--space-1);
+  border-radius: var(--radius-lg);
+  transition: background var(--duration-base) var(--ease-out),
+    box-shadow var(--duration-base) var(--ease-out);
+}
+
+.table-seat.is-top {
+  grid-area: top;
+}
+.table-seat.is-bottom {
+  grid-area: bottom;
+}
+.table-seat.is-left {
+  grid-area: left;
+}
+.table-seat.is-right {
+  grid-area: right;
+}
+
+.table-seat__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  border: 1px solid transparent;
+  max-width: 100%;
+  /* Tags appear and disappear as the turn moves. Without a fixed height the
+     badge would grow, resizing the seat and nudging the whole ring. */
+  height: 40px;
+  overflow: hidden;
+}
+
+.table-seat__avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  color: var(--text-primary);
+  background: linear-gradient(140deg, var(--violet-500), var(--violet-600));
+}
+
+/* Team colours are relative to the viewer: your side is always violet and the
+   opposing side always amber, whichever seat you are actually sitting in.
+   Colour never carries the meaning alone; the tags spell it out too. */
+.table-seat.team-theirs .table-seat__avatar {
+  background: linear-gradient(140deg, var(--amber-500), var(--amber-600));
+  color: var(--card-black);
+}
+
+.table-seat.team-solo .table-seat__avatar {
+  background: linear-gradient(140deg, var(--violet-400), var(--mint-700));
+}
+
+.table-seat__meta {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.table-seat__name {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 12ch;
+}
+
+.table-seat__tags {
+  display: inline-flex;
+  /* Wrapping would make the badge taller and shift the ring, so tags stay on
+     one line and simply clip if a seat somehow earns too many. */
+  flex-wrap: nowrap;
+  gap: var(--space-1);
+  overflow: hidden;
+}
+
+.tag {
+  flex: 0 0 auto;
+}
+
+.tag {
+  font-style: normal;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  padding: 0 var(--space-1);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text-secondary);
+}
+
+.tag--hakem {
+  background: rgba(255, 200, 87, 0.2);
+  color: var(--warning-text);
+}
+
+.tag--self {
+  background: rgba(0, 212, 170, 0.18);
+  color: var(--accent-text);
+}
+
+.tag--partner {
+  background: rgba(157, 134, 255, 0.22);
+  color: var(--violet-100);
+}
+
+.tag--offline {
+  background: rgba(255, 84, 112, 0.18);
+  color: var(--danger-text);
+}
+
+/* The active seat is marked with a ring, a tint and a pulse, never colour
+   alone: the same seat also carries a "نوبت" tag for anyone who cannot rely on
+   the highlight. */
+.table-seat.is-turn .table-seat__badge {
+  border-color: var(--accent);
+  background: rgba(0, 212, 170, 0.18);
+  box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.22);
+  animation: seat-turn-pulse 1.8s var(--ease-in-out) infinite;
+}
+
+@keyframes seat-turn-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.22);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 212, 170, 0.1);
+  }
+}
+
+.tag--turn {
+  background: rgba(0, 212, 170, 0.24);
+  color: var(--accent-text);
+}
+
+.table-seat.is-offline {
+  opacity: 0.55;
+}
+
+.table-seat.is-empty .table-seat__avatar {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+/* The card stage.
+   Cards are painted in a layer that is taken out of normal flow, so a card
+   landing, stacking or flying can never change the size of the seat and shove
+   the rest of the table around. The stage itself is a fixed box that always
+   occupies the same space whether it holds a card or not. */
+.table-seat__played {
+  position: relative;
+  width: 58px;
+  height: 84px;
+  /* Never let a card's size feed back into the grid. */
+  flex: 0 0 auto;
+  /* A played card flies in from well outside this box, so it must not clip. */
+  overflow: visible;
+}
+
+/* Everything inside the stage is absolutely positioned: zero layout impact.
+   Centring is done with `inset` and grid placement rather than a transform,
+   because the card entrance animates `transform` on this very element and any
+   centring offset there would be wiped out mid-flight. */
+.table-seat__played > * {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+}
+
+.table-seat__empty-slot {
+  width: 58px;
+  height: 84px;
+  border-radius: var(--radius-md);
+  border: 1px dashed var(--border-subtle);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+/* Very narrow phones: the left/right columns are the tight ones, so their
+   card slots shrink and the least important tag drops out rather than letting
+   the ring overflow horizontally. */
+@media (max-width: 380px) {
+  .table-center {
+    padding: var(--space-2);
+    gap: var(--space-1);
+  }
+
+  .table-seat.is-left .table-seat__played,
+  .table-seat.is-right .table-seat__played {
+    width: 42px;
+    height: 62px;
+  }
+
+  .table-seat.is-left .draw-stack,
+  .table-seat.is-right .draw-stack {
+    width: 42px;
+    height: 62px;
+  }
+
+  .table-seat.is-left .table-seat__empty-slot,
+  .table-seat.is-right .table-seat__empty-slot {
+    width: 42px;
+    height: 62px;
+  }
+
+  .table-seat.is-left .card.compact,
+  .table-seat.is-right .card.compact {
+    width: 42px;
+    height: 62px;
+  }
+
+  .table-seat.is-left .tag--count,
+  .table-seat.is-right .tag--count {
+    display: none;
+  }
+
+  .table-seat__name {
+    max-width: 8ch;
+  }
+}
+
+.turn-badge {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-pill);
+  background: var(--surface-inset);
+  color: var(--text-primary);
+  font-weight: 800;
+  /* The text swings between "نوبت توئه" and a full sentence naming the hakem.
+     A fixed height and a reserved width stop the centre of the table from
+     resizing every time the message changes. */
+  min-height: 38px;
+  display: grid;
+  place-items: center;
+  min-width: 16ch;
+  max-width: 100%;
+}
+
+.hand {
+  position: sticky;
+  bottom: 0;
+  z-index: var(--z-hand);
+  margin: 0 calc(var(--space-3) * -1) calc(var(--space-3) * -1);
+  padding: var(--space-4) var(--space-3) calc(var(--space-5) + var(--safe-bottom));
+  background: linear-gradient(180deg, transparent, rgba(7, 7, 12, 0.92) 22%);
+  display: flex;
+  gap: var(--space-2);
+  overflow-x: auto;
+  overflow-y: hidden;
+  direction: ltr;
+  /* Cards arrive one at a time during the deal and leave as they are played.
+     Reserving the full card height keeps the row, and everything above it,
+     from jumping as the hand fills and empties. */
+  min-height: calc(92px + var(--space-4) + var(--space-5) + var(--safe-bottom));
+  align-items: flex-end;
+}
+
+/* A card face laid out to the traditional standard: the index (rank over suit)
+   sits tight in the top-left corner and is repeated rotated 180 degrees in the
+   bottom-right, with a large pip in the middle.
+
+   The corner indices are absolutely positioned, which leaves the card with no
+   in-flow content, so it must state its own width and height. Relying on
+   `flex-basis` alone would size it only inside `.hand` (a flex container) and
+   collapse it to zero anywhere else, such as the seat grid on the table. */
+.card {
+  position: relative;
+  direction: ltr;
+  width: 62px;
+  height: 92px;
+  flex: 0 0 auto;
+  border-radius: var(--radius-md);
+  background: linear-gradient(155deg, var(--card-face) 62%, var(--card-face-edge));
+  color: var(--card-black);
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  display: block;
+  padding: 0;
+  overflow: hidden;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out),
+    filter var(--duration-fast) var(--ease-out);
+}
+
+.card__index {
+  position: absolute;
+  top: 4px;
+  left: 5px;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  line-height: 1;
+}
+
+/* The mirrored index: same corner offsets, opposite corner, turned upside down
+   about its own origin so it reads correctly when the card is rotated. */
+.card__index--flipped {
+  top: auto;
+  left: auto;
+  bottom: 4px;
+  right: 5px;
+  transform: rotate(180deg);
+}
+
+.card__rank {
+  font-weight: 900;
+  font-size: var(--text-sm);
+  letter-spacing: -0.4px;
+}
+
+.card__suit {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.card__pip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: var(--text-xl);
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.card.red {
+  color: var(--card-red);
+}
+
+.card.black {
+  color: var(--card-black);
+}
+
+/* Lift only on devices that really hover; on touch this would stick after a tap. */
+@media (hover: hover) {
+  .card:not(:disabled):hover {
+    transform: translateY(-10px);
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+.card:not(:disabled):active {
+  transform: translateY(-4px) scale(0.98);
+}
+
+/* An illegal card is dimmed and desaturated, so "cannot play this" reads
+   instantly without hiding the card the player is looking for. */
+.card.is-blocked {
+  filter: grayscale(0.55) brightness(0.72);
+  opacity: 1;
+}
+
+.card.compact {
+  width: 58px;
+  height: 84px;
+}
+
+.card.compact .card__pip {
+  font-size: var(--text-lg);
+}
+
+.card.selected {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+  transform: translateY(-12px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Card entrance is driven by the Web Animations API in `useCardEntrance`.
+   A CSS mount animation is invisible whenever React reuses the node, which is
+   exactly what happens when a new card lands in a seat that already held one. */
+
+/* Trump picker, as a bottom sheet.
+   Naming trump is the most consequential tap in a hand, so it takes the bottom
+   of the screen where a thumb naturally rests, rather than a small panel
+   floating over the table. */
+.trump-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: var(--space-3);
+  background: rgba(6, 8, 16, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: trump-backdrop-in var(--duration-base) var(--ease-out) both;
+}
+
+.trump-sheet {
+  width: 100%;
+  max-width: 460px;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5) calc(var(--space-5) + var(--safe-bottom));
+  border-radius: var(--radius-2xl) var(--radius-2xl) var(--radius-lg) var(--radius-lg);
+  background: linear-gradient(160deg, rgba(26, 22, 46, 0.98), rgba(14, 14, 26, 0.98));
+  border: 1px solid var(--surface-3);
+  box-shadow: 0 -18px 60px rgba(0, 0, 0, 0.55);
+  animation: trump-sheet-in var(--duration-slow) var(--ease-out) both;
+}
+
+/* The familiar grab handle, so the panel reads as a sheet at a glance. */
+.trump-sheet__grip {
+  justify-self: center;
+  width: 42px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+}
+
+.trump-sheet__title {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-md);
+}
+
+.trump-sheet__hint {
+  margin: 0;
+  text-align: center;
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+  color: var(--text-muted);
+}
+
+.trump-sheet__suits {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2);
+}
+
+.trump-suit {
+  display: grid;
+  place-items: center;
+  gap: var(--space-1);
+  /* Comfortably past the minimum tap target: this is a decisive, one-off tap. */
+  min-height: 84px;
+  border-radius: var(--radius-xl);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--card-black);
+  font-weight: 800;
+  transition:
+    transform var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.trump-suit.red {
+  color: var(--card-red);
+}
+
+.trump-suit:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) {
+  .trump-suit:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.trump-suit__symbol {
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+.trump-suit__label {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.trump-sheet__redeal {
+  font-size: var(--text-sm);
+}
+
+@keyframes trump-backdrop-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes trump-sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.wait-card,
+.result-card {
+  padding: var(--space-4);
+  text-align: center;
+}
+
+.result-card {
+  position: absolute;
+  z-index: var(--z-result);
+  inset: 26% var(--space-3) auto;
+}
+
+.toast {
+  position: fixed;
+  z-index: var(--z-toast);
+  left: var(--space-3);
+  right: var(--space-3);
+  bottom: calc(var(--space-4) + var(--safe-bottom));
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  color: var(--text-white);
+  background: rgba(18, 18, 28, 0.94);
+  border: 1px solid var(--surface-3);
+  box-shadow: var(--shadow-lg);
+}
+
+.phase-card {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.phase-card h3 {
+  margin: 0;
+}
+
+.draw-decision {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-3);
+}
+
+.draw-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.draw-decision small {
+  color: var(--text-muted);
+  line-height: var(--leading-normal);
+  font-size: var(--text-xs);
+}
+
+.target-note {
+  color: var(--accent-text);
+}
+
+.score-badge {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: center;
+  margin: var(--space-2) 0 var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+}
+
+.score-badge strong {
+  font-size: var(--text-base);
+}
+
+.score-badge span {
+  font-weight: 800;
+  font-size: var(--text-md);
+}
+
+.score-badge.normal {
+  background: var(--surface-1);
+  border: 1px solid var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.score-badge.kot {
+  background: rgba(0, 212, 170, 0.14);
+  border: 1px solid rgba(0, 212, 170, 0.4);
+  color: var(--accent-text);
+}
+
+.score-badge.hakem-kot {
+  background: rgba(255, 200, 87, 0.16);
+  border: 1px solid rgba(255, 200, 87, 0.45);
+  color: var(--warning-text);
+}
+
+.score-badge.bam {
+  background: rgba(124, 92, 255, 0.18);
+  border: 1px solid rgba(124, 92, 255, 0.5);
+  color: var(--violet-050);
+}
+
+.redeal-card {
+  border-color: rgba(255, 200, 87, 0.4);
+}
+
+/* Between tricks the winner's place glows briefly and the cards on the table
+   ease towards them, so it is obvious who took the trick. */
+.table-seat.has-won-trick .table-seat__badge {
+  border-color: var(--accent);
+  background: rgba(0, 212, 170, 0.2);
+  animation: seat-won var(--duration-slow) var(--ease-out) both;
+}
+
+.table-seat.has-won-trick .table-seat__played .card {
+  box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.5), var(--shadow-lg);
+}
+
+@keyframes seat-won {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Hakem draw: cards land in each seat's own slot. A draw can go round more
+   than once, so repeats stack with a small offset instead of replacing. */
+.draw-stack {
+  /* Sized to the stage and out of flow, so extra cards cannot grow the seat. */
+  width: 58px;
+  height: 84px;
+}
+
+.draw-stack__card {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  /* Each extra card sits slightly down and across, so the depth of the stack
+     is legible at a glance. */
+  /* Each extra card sits slightly down and across, so the depth of the stack is
+     legible. Purely visual: the stack box itself never changes size. */
+  transform: translate(
+    calc(var(--stack-depth, 0) * 5px),
+    calc(var(--stack-depth, 0) * 5px)
+  );
+  z-index: calc(var(--stack-depth, 0) + 1);
+}
+
+/* Collecting a finished trick is animated in `useCardEntrance`, not here.
+   A CSS transition cannot move these cards: the entrance runs through the Web
+   Animations API, which owns `transform` in a cascade origin above all CSS, so
+   a transition on the same property is silently ignored. */
+

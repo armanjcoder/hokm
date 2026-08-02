@@ -1,0 +1,41 @@
+/* Wider screens and shared layout utilities. */
+
+@media (min-width: 760px) {
+  .app-shell {
+    max-width: var(--shell-max);
+    margin: 0 auto;
+  }
+
+  .hand {
+    justify-content: center;
+    /* Cards are taller here, so the reserved row grows to match. */
+    min-height: calc(106px + var(--space-4) + var(--space-5) + var(--safe-bottom));
+  }
+
+  .card {
+    width: 72px;
+    height: 106px;
+  }
+
+  /* More room to breathe: the ring can afford full-size seats and a wider
+     centre once the shell is no longer phone width. */
+  .table-center {
+    gap: var(--space-4);
+    padding: var(--space-5);
+  }
+
+  .table-seat__name {
+    max-width: 18ch;
+    font-size: var(--text-sm);
+  }
+
+  .table-seat__avatar {
+    width: 36px;
+    height: 36px;
+    font-size: var(--text-sm);
+  }
+}
+
+.full-width {
+  width: 100%;
+}
