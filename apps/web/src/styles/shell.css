@@ -308,7 +308,9 @@
   border-radius: var(--radius-pill);
   font-weight: 800;
   color: var(--text-primary);
-  background: linear-gradient(140deg, var(--violet-400), var(--mint-700));
+  /* Both gradient stops have to clear WCAG AA against the initials. The
+     original pairing measured 2.4:1, which is unreadable. */
+  background: linear-gradient(140deg, var(--violet-600), var(--mint-900));
 }
 
 .avatar--sm {
@@ -331,7 +333,9 @@
 
 /* Sides are coloured relative to the viewer, matching the table exactly. */
 .avatar--ours {
-  background: linear-gradient(140deg, var(--violet-500), var(--violet-600));
+  /* Both stops must clear WCAG AA against the initials, not just the darker
+     one: `violet-500` alone measured 4.05:1, under the 4.5:1 minimum. */
+  background: linear-gradient(140deg, var(--violet-600), var(--violet-700));
 }
 
 .avatar--theirs {

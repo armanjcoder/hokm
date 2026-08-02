@@ -224,3 +224,63 @@ describe('game actions give physical feedback', () => {
     expect(emitted).toHaveLength(1);
   });
 });
+
+describe('resuming a saved table', () => {
+  it('moves into the resuming state and re-uses the saved seat', () => {
+    const stored: StoredSession = { roomId: 'r9', playerId: 'p9', apiUrl: 'https://api.test' };
+    localStorage.setItem('hokm.session', JSON.stringify(stored));
+
+    const result = renderHook(() => useSession('https://api.test'));
+    expect(result.current.phase).toBe('idle');
+
+    act(() => result.current.resume());
+    expect(result.current.phase).toBe('resuming');
+    expect(result.current.session?.roomId).toBe('r9');
+  });
+
+  it('does nothing when there is no saved table to resume', () => {
+    const result = renderHook(() => useSession('https://api.test'));
+    act(() => result.current.resume());
+    expect(result.current.phase).toBe('idle');
+    expect(result.current.session).toBeNull();
+  });
+
+  it('abandons a resume without wiping the saved table', () => {
+    // The player may want to try again later, so cancelling must not clear it.
+    const stored: StoredSession = { roomId: 'r9', playerId: 'p9', apiUrl: 'https://api.test' };
+    localStorage.setItem('hokm.session', JSON.stringify(stored));
+
+    const result = renderHook(() => useSession('https://api.test'));
+    act(() => result.current.resume());
+    act(() => result.current.cancelResume());
+
+    expect(result.current.phase).toBe('idle');
+    expect(result.current.session).toBeNull();
+    expect(result.current.savedSession?.roomId).toBe('r9');
+  });
+
+  it('becomes active once the table actually arrives', () => {
+    const result = renderHook(() => useSession('https://api.test'));
+    act(() => result.current.markActive());
+    expect(result.current.phase).toBe('active');
+  });
+
+  it('keeps the api url on the session when it changes', () => {
+    const result = renderHook(() => useSession('https://old.test'));
+    act(() =>
+      result.current.activate({ roomId: 'r1', playerId: 'p1', apiUrl: 'https://old.test' }),
+    );
+    act(() => result.current.updateApiUrl('https://new.test/'));
+
+    expect(result.current.apiUrl).toBe('https://new.test');
+    expect(result.current.session?.apiUrl).toBe('https://new.test');
+    // Persisted too, so a reload does not fall back to the stale host.
+    expect(JSON.parse(localStorage.getItem('hokm.session')!).apiUrl).toBe('https://new.test');
+  });
+
+  it('changing the api url before joining does not invent a session', () => {
+    const result = renderHook(() => useSession('https://old.test'));
+    act(() => result.current.updateApiUrl('https://new.test'));
+    expect(result.current.session).toBeNull();
+  });
+});

@@ -525,3 +525,47 @@ describe('product decisions that must not regress', () => {
     }
   });
 });
+
+describe('gradient backgrounds are readable end to end', () => {
+  const shell = read(path.join(stylesDir, 'shell.css'));
+
+  /** Every colour stop inside a rule's `background` gradient. */
+  function gradientStops(selector: string): string[] {
+    const at = shell.indexOf(`${selector} {`);
+    expect(at, `${selector} should exist`).toBeGreaterThan(-1);
+    const body = shell.slice(at, shell.indexOf('}', at));
+    // Only the background gradient; a `color` declaration in the same rule is
+    // the foreground and must not be treated as a stop.
+    const gradient = body.match(/background:[^;]*linear-gradient\(([^;]*)\)/)?.[1] ?? '';
+    return [...gradient.matchAll(/var\(--([a-z0-9-]+)\)/g)].map((match) => match[1]!);
+  }
+
+  /**
+   * A gradient is only as readable as its lightest stop. Checking one end was
+   * how avatar initials shipped at 2.4:1, which is unreadable.
+   */
+  function expectAllStopsReadable(selector: string, foreground: string) {
+    const stops = gradientStops(selector);
+    expect(stops.length, `${selector} should have gradient stops`).toBeGreaterThan(0);
+    for (const stop of stops) {
+      const value = token(stop);
+      if (!/^#[0-9a-f]{3,8}$/i.test(value)) continue;
+      expect(
+        contrast(token(foreground), value),
+        `${selector}: ${foreground} on ${stop} must clear WCAG AA`,
+      ).toBeGreaterThanOrEqual(4.5);
+    }
+  }
+
+  it('keeps initials readable on the default avatar', () => {
+    expectAllStopsReadable('.avatar', 'text-primary');
+  });
+
+  it('keeps initials readable on your own side', () => {
+    expectAllStopsReadable('.avatar--ours', 'text-primary');
+  });
+
+  it('keeps initials readable on the opposing side', () => {
+    expectAllStopsReadable('.avatar--theirs', 'card-black');
+  });
+});

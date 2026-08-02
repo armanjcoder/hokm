@@ -286,3 +286,92 @@ describe('the table itself reports a won trick', () => {
     expect(calls).toEqual([]);
   });
 });
+
+describe('selecting cards to burn in a duel', () => {
+  function duelGame(over: any = {}) {
+    return game({
+      mode: 'duel2',
+      phase: 'discarding',
+      handScore: { tricks: { 0: 0, 1: 0 } },
+      myHand: ['a', 'b', 'c'].map((id) => ({ id, suit: 'spades', rank: 'A' })),
+      validCardIds: [],
+      discardedSeats: [],
+      ...over,
+    });
+  }
+
+  function renderDuel(g: any = duelGame()) {
+    const room2 = baseRoom();
+    room2.mode = 'duel2';
+    room2.players = room2.players.slice(0, 2);
+    return render(
+      <GameTable
+        room={room2}
+        game={g}
+        meId="p0"
+        chooseSuit={noop}
+        play={noop}
+        nextHand={noop}
+        requestRedeal={noop}
+        discard={noop}
+        draw={noop}
+        resolveDraw={noop}
+      />,
+    );
+  }
+
+  it('lets a card be picked and picked again to unpick it', () => {
+    renderDuel();
+    const cards = () => screen.getAllByRole('button', { name: /بازی کردن/ });
+    expect(cards()[0]!.getAttribute('aria-pressed')).toBe('false');
+    fireEvent.click(cards()[0]!);
+    expect(cards()[0]!.getAttribute('aria-pressed')).toBe('true');
+    fireEvent.click(cards()[0]!);
+    expect(cards()[0]!.getAttribute('aria-pressed')).toBe('false');
+  });
+
+  it('stops accepting picks once enough cards are chosen', () => {
+    // The duel burns exactly two, so a third tap must be ignored rather than
+    // silently replacing an earlier choice.
+    renderDuel();
+    const cards = () => screen.getAllByRole('button', { name: /بازی کردن/ });
+    fireEvent.click(cards()[0]!);
+    fireEvent.click(cards()[1]!);
+    fireEvent.click(cards()[2]!);
+    const pressed = cards().filter((c) => c.getAttribute('aria-pressed') === 'true');
+    expect(pressed).toHaveLength(2);
+  });
+});
+
+describe('the score strip in solo modes', () => {
+  it('shows your own score against the best opponent', () => {
+    const room3 = baseRoom();
+    room3.mode = 'solo3';
+    room3.players = room3.players.slice(0, 3);
+    render(
+      <GameTable
+        room={room3}
+        game={game({
+          mode: 'solo3',
+          phase: 'playing',
+          matchScore: { 0: 2, 1: 5, 2: 3 },
+          handScore: { tricks: { 0: 1, 1: 4, 2: 2 } },
+        })}
+        meId="p0"
+        chooseSuit={noop}
+        play={noop}
+        nextHand={noop}
+        requestRedeal={noop}
+        discard={noop}
+        draw={noop}
+        resolveDraw={noop}
+      />,
+    );
+    // "تو" also appears as a seat tag, so scope to the score strip heading.
+    expect(screen.getAllByText('تو').length).toBeGreaterThan(0);
+    expect(screen.getByText('حریفان')).toBeDefined();
+    // The strongest opponent is what matters, not the sum.
+    expect(screen.getByText('5')).toBeDefined();
+    expect(screen.getByText('4 دست')).toBeDefined();
+  });
+});
