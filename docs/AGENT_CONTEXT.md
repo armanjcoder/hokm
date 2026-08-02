@@ -96,7 +96,7 @@
 
 ## ۳) وضعیت فعلی پروژه
 
-**تست‌ها: ۹۷۶ تست، همه سبز** — game-engine ۱۲۲ · api ۲۸۳ · web ۵۷۱
+**تست‌ها: ۹۹۰ تست، همه سبز** — game-engine ۱۲۲ · api ۲۸۸ · web ۵۸۰
 پوشش مینی‌اپ: **۹۳.۴٪** (`Avatar.tsx` و `ProfileSheet.tsx` هر دو ۱۰۰٪)
 `npm run build` ✅ · `npm run typecheck` ✅
 
@@ -179,7 +179,8 @@ packages/game-engine/src/
 **HTTP**
 `GET /health` · `GET /rooms/:roomId` · `POST /rooms` ·
 `POST /rooms/:roomId/{join,settings,add-bot,bot-difficulty,remove-bot,ready,leave}` ·
-`GET /rooms/:roomId/players/:playerId/avatar` (عکس پروفایل، بدون احراز هویت — عمداً)
+`GET /rooms/:roomId/players/:playerId/avatar` (عکس پروفایل بازیکنِ سر میز، بدون احراز هویت — عمداً) ·
+`GET /me/avatar?initData=…` (عکس خودِ کاربر، **قبل از نشستن سر میز**؛ با امضا احراز می‌شود)
 
 **Socket.IO — کلاینت به سرور**
 `room:join` · `game:choose_trump` · `game:play_card` · `game:next_hand` ·
@@ -492,6 +493,31 @@ origin خودمان حرف می‌زند.
 **نکته‌ی مهم:** probe شماره ۳ اول **صفر خطا** داد در `avatar-proxy.test.ts` —
 یعنی تست ناقص بود، نه کد سالم. تست بازنویسی شد تا با شمارنده‌ی hit ثابت کند
 هیچ connectionی باز نشده؛ بعد از آن probe درست ۱۱ خطا داد.
+
+### باگ بعد از تحویل: پروفایل اصلاً دیده نمی‌شد
+
+کاربر گزارش داد «هنوز پروفایل رو نشون نمیده». **کد درست بود، ولی غیرقابل
+دسترس.** تنها ورودیِ پروفایل داخل `TopBar` بود، و `TopBar` فقط داخل
+`TableScreen` رندر می‌شود — یعنی **فقط بعد از پیوستن به میز**. صفحه‌ی اول
+(Landing) هیچ ورودی‌ای نداشت.
+
+چرا تست‌ها نگرفتند: همه‌شان `TopBar` یا `TableScreen` را **مستقیم** رندر
+می‌کردند. دقیقاً همان اشتباه `PlayingCard`/`TableSeat` در فازهای قبل، با یک
+سطح بالاتر: این بار خودِ *مسیر رسیدن* تست نشده بود، نه اتصال props.
+
+**اصلاح:**
+- دکمه‌ی پروفایل به `Landing` اضافه شد (`.hero-card__top`).
+- `ProfileSheet` حالا `room` را اختیاری می‌گیرد و بدون میز هم کار می‌کند.
+- endpoint جدید `GET /me/avatar?initData=…`: مسیر قبلی به room+seat نیاز داشت
+  که روی صفحه‌ی اول وجود ندارد. هویت از `initData` امضاشده می‌آید.
+  `initData` در query است چون `<img src>` نه body دارد نه header سفارشی —
+  این trade-off واقعی است و در کامنت کد صادقانه ثبت شده.
+- فایل `apps/web/test/profile-reachability.test.tsx`: **از خود `App` mount
+  می‌کند**، نه از کامپوننت. probe انجام شد: با برگرداندن دقیقِ باگ اصلی،
+  **هر ۹ تست قرمز شد**.
+
+**قاعده‌ی جدید:** برای هر قابلیت کاربرمحور، یک تست «قابل رسیدن بودن» از سطح
+`App` لازم است. «کامپوننت درست کار می‌کند» ≠ «کاربر می‌تواند به آن برسد».
 
 ### چیزی که اثبات نشده
 عکس واقعی از تلگرام واقعی هرگز در این sandbox بارگذاری نشده — نه مرورگر داریم

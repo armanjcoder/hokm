@@ -18,6 +18,7 @@ import { useGameActions } from './hooks/useGameActions.js';
 import { useSession } from './hooks/useSession.js';
 import { useLobbyActions } from './hooks/useLobbyActions.js';
 import { createRoomRequest, joinRoomRequest } from './api/client.js';
+import { ProfileSheet } from './components/ProfileSheet.js';
 import { RulesGuide } from './components/RulesGuide.js';
 import { TableScreen } from './components/TableScreen.js';
 import { renderEntryScreen } from './components/EntryScreen.js';
@@ -44,6 +45,7 @@ export function App() {
   const [mode, setMode] = useState<GameMode>('classic4');
   const [targetScore, setTargetScore] = useState(7);
   const [rulesFor, setRulesFor] = useState<GameMode | null>(null);
+  const [profileOpen, setProfileOpen] = useState(false);
   const autoJoinAttempted = useRef(false);
 
   const socket = useMemo<Socket>(() => createGameSocket(apiUrl), [apiUrl]);
@@ -220,7 +222,20 @@ export function App() {
       setApiUrl: updateApiUrl, loading, createRoom, joinRoom, toast,
       mode, setMode, showRules: () => setRulesFor(mode),
       targetScore, setTargetScore, resumeSession,
+      initData, showProfile: () => setProfileOpen(true),
     },
+    // The profile must be reachable before a table exists, so it is rendered
+    // beside the entry screens the same way the rules guide is.
+    profileOverlay: profileOpen ? (
+      <ProfileSheet
+        me={undefined}
+        apiUrl={apiUrl}
+        initData={initData}
+        fallbackName={name}
+        telegramUser={Boolean(tgUser)}
+        onClose={() => setProfileOpen(false)}
+      />
+    ) : null,
   });
   if (entry) return entry;
   // `renderEntryScreen` only returns null once both are present, but TypeScript

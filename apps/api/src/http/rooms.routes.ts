@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { getModeConfig, type OptionalRules, type Seat } from '@hokm/game-engine';
 import { authenticate } from '../auth.js';
 import { config } from '../config.js';
@@ -235,6 +235,37 @@ roomsRouter.post('/rooms/:roomId/leave', (req, res) => {
 });
 
 /**
+ * Serves the caller's own Telegram profile photo, with no room involved.
+ *
+ * The room-scoped route below cannot help on the landing screen, where the
+ * player has not joined a table yet but still wants to see who the game thinks
+ * they are. Identity comes from the signed `initData`, exactly like every other
+ * authenticated action.
+ *
+ * `initData` travels as a query parameter because the browser fetches this with
+ * a plain `<img src>`, which cannot send a body or custom headers. That is a
+ * real trade-off: the value ends up in the URL. It is mitigated by the fact
+ * that `initData` is already short-lived (24h) and bound to the bot token, and
+ * the response is marked private so no shared cache retains it.
+ */
+roomsRouter.get('/me/avatar', async (req, res, next) => {
+  try {
+    if (!enforceLimit(avatarLimiter, req, res)) return;
+
+    const raw = req.query.initData;
+    const identity = authenticate(typeof raw === 'string' ? raw : undefined);
+    if (!identity.photoUrl) return res.status(404).json(errorBody('AVATAR_NOT_FOUND'));
+
+    const image = await fetchAvatar(identity.photoUrl, createTelegramProxyAgent(config.telegramProxyUrl));
+    if (!image) return res.status(404).json(errorBody('AVATAR_NOT_FOUND'));
+
+    return sendAvatar(res, image);
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
  * Serves a seated player's Telegram profile photo.
  *
  * Fetched server-side rather than linked directly, because Telegram's photo CDN
@@ -257,15 +288,20 @@ roomsRouter.get('/rooms/:roomId/players/:playerId/avatar', async (req, res, next
     const image = await fetchAvatar(player.photoUrl, createTelegramProxyAgent(config.telegramProxyUrl));
     if (!image) return res.status(404).json(errorBody('AVATAR_NOT_FOUND'));
 
-    // Avatars change rarely, and a stale one is harmless, so let the client keep
-    // it: re-fetching through a censored network on every render is expensive.
-    res.setHeader('Cache-Control', 'private, max-age=3600');
-    res.setHeader('Content-Type', image.contentType);
-    res.setHeader('Content-Length', String(image.body.length));
-    // The bytes are an image no matter what the CDN said; stop a sniffed type.
-    res.setHeader('X-Content-Type-Options', 'nosniff');
-    return res.end(image.body);
+    return sendAvatar(res, image);
   } catch (error) {
     return next(error);
   }
 });
+
+/** Shared response shaping for both avatar routes. */
+function sendAvatar(res: Response, image: { body: Buffer; contentType: string }) {
+  // Avatars change rarely, and a stale one is harmless, so let the client keep
+  // it: re-fetching through a censored network on every render is expensive.
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  res.setHeader('Content-Type', image.contentType);
+  res.setHeader('Content-Length', String(image.body.length));
+  // The bytes are an image no matter what the CDN said; stop a sniffed type.
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  return res.end(image.body);
+}

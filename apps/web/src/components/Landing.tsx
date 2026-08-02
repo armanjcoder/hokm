@@ -2,6 +2,9 @@ import type { GameMode } from '@hokm/game-engine';
 import type { StoredSession } from '../lib.js';
 import { MODE_OPTIONS, TARGET_SCORE_OPTIONS } from '../types.js';
 import { isTelegramHost } from '../telegram.js';
+import { myAvatarUrl } from '../lib.js';
+import { initialsFor } from '../table-seats.js';
+import { Avatar } from './Avatar.js';
 
 export function Landing(props: {
   name: string; setName: (name: string) => void; joinCode: string; setJoinCode: (code: string) => void;
@@ -9,6 +12,7 @@ export function Landing(props: {
   savedSession: StoredSession | null; linkedRoomId: string; resumeSession: () => void; clearSavedSession: () => void;
   mode: GameMode; setMode: (mode: GameMode) => void; showRules: () => void;
   targetScore: number; setTargetScore: (score: number) => void;
+  showProfile: () => void; initData: string;
 }) {
   const linkPointsElsewhere = Boolean(props.linkedRoomId) && props.linkedRoomId !== props.savedSession?.roomId;
   const inTelegram = isTelegramHost();
@@ -33,7 +37,26 @@ export function Landing(props: {
         </section>
       )}
       <section className="hero-card">
-        <div className="brand"><span>♠</span> Hokm Club</div>
+        <div className="hero-card__top">
+          <div className="brand"><span>♠</span> Hokm Club</div>
+          {/* The profile has to be reachable here too: this is the first screen
+              a player sees, and before joining a table there was previously no
+              way to open it at all. */}
+          <button
+            className="profile-button"
+            type="button"
+            aria-label="پروفایل من"
+            onClick={props.showProfile}
+          >
+            <Avatar
+              initials={initialsFor(props.name, 0)}
+              tone="ours"
+              size="sm"
+              photoUrl={myAvatarUrl(props.apiUrl, props.initData)}
+            />
+            <span className="profile-button__seat">پروفایل</span>
+          </button>
+        </div>
         <h1>حکم، همین‌جا در تلگرام</h1>
         <p className="hero-lede">
           میز بساز، لینکش را برای دوستانت بفرست و شروع کن. نفر کم داشتی، ربات

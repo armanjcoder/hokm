@@ -22,6 +22,8 @@ interface LandingProps {
   targetScore: number;
   setTargetScore: (score: number) => void;
   resumeSession: () => void;
+  showProfile: () => void;
+  initData: string;
 }
 
 /**
@@ -38,6 +40,7 @@ export function renderEntryScreen({
   cancelResume,
   forgetSession,
   landing,
+  profileOverlay,
 }: {
   sessionPhase: SessionPhase;
   room: RoomView | null;
@@ -45,6 +48,8 @@ export function renderEntryScreen({
   savedSession: StoredSession | null;
   connection: ConnectionStatus;
   rulesOverlay: ReactNode;
+  /** The player's profile card, openable before any table is joined. */
+  profileOverlay?: ReactNode;
   cancelResume: () => void;
   forgetSession: (message?: string) => void;
   landing: LandingProps;
@@ -60,6 +65,7 @@ export function renderEntryScreen({
           forget={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
         />
         {rulesOverlay}
+        {profileOverlay}
       </>
     );
   }
@@ -74,6 +80,7 @@ export function renderEntryScreen({
           clearSavedSession={() => forgetSession('نشست قبلی پاک شد. حالا می‌تونی میز جدید بسازی.')}
         />
         {rulesOverlay}
+        {profileOverlay}
       </>
     );
   }

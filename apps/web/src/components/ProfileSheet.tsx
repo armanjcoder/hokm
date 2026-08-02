@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { avatarUrl } from '../lib.js';
+import { avatarUrl, myAvatarUrl } from '../lib.js';
 import { initialsFor } from '../table-seats.js';
 import { useFocusTrap } from '../useFocusTrap.js';
 import type { RoomPlayer, RoomView } from '../types.js';
@@ -22,18 +22,31 @@ export function ProfileSheet({
   me,
   apiUrl,
   onClose,
+  /** Signed Telegram data, used to load the photo when there is no table yet. */
+  initData = '',
+  /** Name to show before the player has a seat. */
+  fallbackName,
+  /** True when Telegram identified the viewer but no room has been joined. */
+  telegramUser = false,
 }: {
-  room: RoomView;
+  /** Omitted on the landing screen, where no table exists. */
+  room?: RoomView | undefined;
   me: RoomPlayer | undefined;
   apiUrl: string;
   onClose: () => void;
+  initData?: string;
+  fallbackName?: string | undefined;
+  telegramUser?: boolean;
 }) {
   const sheetRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   useFocusTrap({ containerRef: sheetRef, onClose, initialFocusRef: closeRef });
 
-  const photo = avatarUrl(apiUrl, room.id, me);
-  const isTelegram = me?.telegramId !== undefined;
+  // At a table the photo is proxied per seat; before that there is no seat, so
+  // the server identifies the viewer from their signed Telegram data instead.
+  const photo = room && me ? avatarUrl(apiUrl, room.id, me) : myAvatarUrl(apiUrl, initData);
+  const isTelegram = me ? me.telegramId !== undefined : telegramUser;
+  const displayName = me?.name ?? fallbackName ?? 'بازیکن مهمان';
 
   // Says exactly which of the three states the player is in, because "no photo"
   // has three different causes and only one of them is worth acting on.
@@ -57,15 +70,19 @@ export function ProfileSheet({
       >
         <div className="profile-sheet__head">
           <Avatar
-            initials={initialsFor(me?.name, me?.seat ?? 0)}
+            initials={initialsFor(displayName, me?.seat ?? 0)}
             tone="ours"
             size="lg"
             photoUrl={photo}
           />
           <div className="profile-sheet__identity">
-            <h2 id="profile-title">{me?.name ?? 'بازیکن مهمان'}</h2>
+            <h2 id="profile-title">{displayName}</h2>
             <p className="profile-sheet__role">
-              {me ? `صندلی ${me.seat + 1} این میز` : 'تماشاچی این میز'}
+              {me
+                ? `صندلی ${me.seat + 1} این میز`
+                : room
+                  ? 'تماشاچی این میز'
+                  : 'هنوز سر هیچ میزی ننشسته‌ای'}
             </p>
           </div>
         </div>
@@ -77,7 +94,7 @@ export function ProfileSheet({
           </div>
           <div>
             <dt>میز فعلی</dt>
-            <dd>{room.code}</dd>
+            <dd>{room ? room.code : '—'}</dd>
           </div>
         </dl>
 

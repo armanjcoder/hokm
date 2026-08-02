@@ -95,6 +95,17 @@ export function buildInviteLink(origin: string, pathname: string, roomId: string
  * broken avatar. Returns undefined when the player has no public photo, which is
  * the normal case for guests and bots.
  */
+/**
+ * Photo endpoint for the viewer themselves, before any table exists.
+ *
+ * The room-scoped URL needs a seat; on the landing screen there is none, so the
+ * server is asked to identify the caller from their signed `initData` instead.
+ */
+export function myAvatarUrl(apiUrl: string, initData: string): string | undefined {
+  if (!apiUrl || !initData) return undefined;
+  return `${normalizeApiUrl(apiUrl)}/me/avatar?initData=${encodeURIComponent(initData)}`;
+}
+
 export function avatarUrl(
   apiUrl: string,
   roomId: string,

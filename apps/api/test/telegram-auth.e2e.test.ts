@@ -204,3 +204,41 @@ describe('avatar endpoint end to end', () => {
     expect(response.status).toBe(404);
   }, 30000);
 });
+
+describe('room-free avatar endpoint for the landing screen', () => {
+  const PHOTO_USER = { id: 555555, first_name: 'لندینگ', photo_url: 'https://t.me/i/userpic/320/q.jpg' };
+
+  it('rejects an unsigned request instead of serving anything', async () => {
+    const response = await fetch(`${server.url}/me/avatar`);
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects a forged initData', async () => {
+    const forged = 'user=%7B%22id%22%3A1%7D&auth_date=1&hash=deadbeef';
+    const response = await fetch(`${server.url}/me/avatar?initData=${encodeURIComponent(forged)}`);
+    expect(response.status).toBe(401);
+  });
+
+  it('accepts a valid signature and answers rather than hanging', async () => {
+    const signed = signInitData(PHOTO_USER);
+    const response = await fetch(`${server.url}/me/avatar?initData=${encodeURIComponent(signed)}`);
+    // t.me is unreachable from the sandbox, so a 404 is the correct, prompt
+    // answer. What matters is that authentication passed and it did not stall.
+    expect([200, 404]).toContain(response.status);
+  }, 30000);
+
+  it('404s for a verified user who has no public photo', async () => {
+    const signed = signInitData({ id: 666666, first_name: 'بی‌عکس' });
+    const response = await fetch(`${server.url}/me/avatar?initData=${encodeURIComponent(signed)}`);
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe('AVATAR_NOT_FOUND');
+  });
+
+  it('never echoes the CDN url back in the error body', async () => {
+    const signed = signInitData(PHOTO_USER);
+    const response = await fetch(`${server.url}/me/avatar?initData=${encodeURIComponent(signed)}`);
+    if (response.status === 404) {
+      expect(JSON.stringify(await response.json())).not.toContain('userpic');
+    }
+  }, 30000);
+});

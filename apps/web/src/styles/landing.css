@@ -413,3 +413,12 @@ label {
   line-height: var(--leading-relaxed);
   color: var(--text-secondary);
 }
+
+/* Brand row on the landing screen: title on one side, profile on the other. */
+.hero-card__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
