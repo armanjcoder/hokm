@@ -187,3 +187,60 @@
   font-size: var(--text-sm);
   padding: var(--space-3) var(--space-1);
 }
+
+/* A lobby chair. Reads top to bottom: who, then their state. */
+.seat-card__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.seat-card__identity {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.seat-card__name {
+  font-size: var(--text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.seat-card__tags {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tag--host {
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+
+.tag--bot {
+  background: rgba(157, 134, 255, 0.18);
+  color: var(--violet-100);
+}
+
+/* A tinted edge on the viewer's own side, so partners are obvious before the
+   hand even starts. Colour never carries the meaning alone: the "یار" tag
+   spells it out too. */
+.seat-card.team-ours {
+  border-color: rgba(157, 134, 255, 0.4);
+}
+
+.seat-card.team-theirs {
+  border-color: rgba(255, 200, 87, 0.28);
+}
+
+.seat-card.is-empty {
+  border-style: dashed;
+}
+
+.seat-card.is-empty .seat-card__name {
+  color: var(--text-muted);
+  font-weight: 600;
+}

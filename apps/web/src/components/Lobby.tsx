@@ -1,4 +1,5 @@
 import { getModeConfig } from '@hokm/game-engine';
+import { LobbySeat } from './LobbySeat.js';
 import {
   DIFFICULTY_OPTIONS,
   MODE_OPTIONS,
@@ -31,6 +32,21 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty,
   const totalSeats = getModeConfig(room.mode).seats;
   const seatsFull = room.players.length === totalSeats;
   const waiting = readiness?.waitingOn.length ?? 0;
+  const teamPlay = getModeConfig(room.mode).teamPlay;
+  const mySeat = me?.seat ?? 0;
+
+  // Team membership is expressed relative to the viewer, exactly as it is at
+  // the table, so "our side" is the same colour in both places.
+  const seats = Array.from({ length: totalSeats }, (_, seat) => {
+    const player = room.players.find((candidate) => candidate.seat === seat);
+    const myTeam = teamPlay ? seat % 2 === mySeat % 2 : seat === mySeat;
+    return {
+      seat,
+      player,
+      myTeam,
+      isPartner: teamPlay && myTeam && seat !== mySeat,
+    };
+  });
 
   return (
     <section className="panel lobby-panel">
@@ -116,58 +132,23 @@ export function Lobby({ room, me, isHost, toggleReady, addBot, setBotDifficulty,
         </p>
       )}
 
-      <div className="seat-grid">
-        {Array.from({ length: totalSeats }, (_, seat) => seat).map((seat) => {
-          const player = room.players.find((p) => p.seat === seat);
-          const offline = Boolean(player) && !player?.isBot && !player?.connected;
-          const isMe = player?.id === me?.id;
-          const host = Boolean(player) && player?.id === room.hostPlayerId;
-          return (
-            <div className={`seat-card ${offline ? 'offline' : ''} ${player?.ready ? 'ready' : ''}`} key={seat}>
-              <span>
-                صندلی {seat + 1}
-                {host && <b className="host-tag">سازنده</b>}
-              </span>
-              <strong>
-                {player ? `${player.name}${player.isBot ? ' 🤖' : ''}${isMe ? ' (تو)' : ''}` : 'در انتظار بازیکن...'}
-              </strong>
-              <div className="seat-footer">
-                {player && !player.isBot && (
-                  <em className={`seat-status ${player.ready ? 'is-ready' : ''}`}>
-                    {player.ready ? 'آماده ✓' : offline ? 'قطع شده' : 'در انتظار آمادگی'}
-                  </em>
-                )}
-                {player?.isBot && isHost && (
-                  <div className="bot-controls">
-                    <select
-                      className="bot-difficulty"
-                      aria-label={`سطح سختی ${player.name}`}
-                      value={player.difficulty ?? 'medium'}
-                      disabled={busy}
-                      onChange={(event) =>
-                        setBotDifficulty(player.id, event.target.value as BotDifficulty)
-                      }
-                    >
-                      {DIFFICULTY_OPTIONS.map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button className="seat-remove" type="button" disabled={busy} onClick={() => removeBot(player.id)}>
-                      حذف
-                    </button>
-                  </div>
-                )}
-                {player?.isBot && !isHost && (
-                  <em className="seat-status">
-                    {DIFFICULTY_OPTIONS.find((o) => o.id === (player.difficulty ?? 'medium'))?.label}
-                  </em>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="seat-grid" role="list" aria-label="صندلی‌های میز">
+        {seats.map(({ seat, player, myTeam, isPartner }) => (
+          <LobbySeat
+            key={seat}
+            seat={seat}
+            player={player}
+            isMe={player?.id === me?.id}
+            isHost={Boolean(player) && player?.id === room.hostPlayerId}
+            isPartner={isPartner}
+            teamPlay={teamPlay}
+            myTeam={myTeam}
+            viewerIsHost={isHost}
+            busy={busy}
+            setBotDifficulty={setBotDifficulty}
+            removeBot={removeBot}
+          />
+        ))}
       </div>
 
       <div className="ready-status">

@@ -1,5 +1,6 @@
 import { seatInitials, seatLabel, type SeatView, type TablePosition } from '../table-seats.js';
 import { PlayingCard } from './PlayingCard.js';
+import { Avatar } from './Avatar.js';
 
 /**
  * One player's place at the table.
@@ -52,9 +53,12 @@ export function TableSeat({
   return (
     <div className={classes} aria-label={described}>
       <div className="table-seat__badge">
-        <span className="table-seat__avatar" aria-hidden="true">
-          {seatInitials(view)}
-        </span>
+        <Avatar
+          initials={seatInitials(view)}
+          tone={empty ? 'empty' : teamPlay ? (view.isMyTeam ? 'ours' : 'theirs') : 'solo'}
+          isBot={Boolean(view.player?.isBot)}
+          size="sm"
+        />
         <span className="table-seat__meta">
           <strong className="table-seat__name">
             {label}

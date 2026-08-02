@@ -122,7 +122,10 @@ describe('Landing', () => {
 
   it('disables both actions while a request is in flight', () => {
     renderLanding({ loading: true });
-    expect((screen.getByText('ساخت میز جدید') as HTMLButtonElement).disabled).toBe(true);
+    // While loading, the button reports progress instead of its idle label.
+    expect((screen.getByRole('button', { name: 'در حال ساخت…' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
     expect((screen.getByText('ورود') as HTMLButtonElement).disabled).toBe(true);
   });
 
@@ -155,5 +158,47 @@ describe('Landing', () => {
       linkedRoomId: 'r1',
     });
     expect(screen.queryByText(/مربوط به میز دیگری است/)).toBeNull();
+  });
+    describe('the landing screen suits the audience it is shown to', () => {
+    afterEach(() => {
+      delete (window as unknown as { Telegram?: unknown }).Telegram;
+    });
+
+    function inTelegram() {
+      (window as unknown as { Telegram: unknown }).Telegram = {
+        WebApp: { ready() {}, expand() {} },
+      };
+    }
+
+    it('hides the developer backend field inside Telegram', () => {
+      // The bot link already carries the API address, so exposing it to players
+      // is noise they can only get wrong.
+      inTelegram();
+      renderLanding();
+      expect(screen.queryByText('تنظیم بک‌اند محلی')).toBeNull();
+    });
+
+    it('still offers it in a plain browser, where it is needed', () => {
+      renderLanding();
+      expect(screen.getByText('تنظیم بک‌اند محلی')).toBeDefined();
+    });
+
+    it('labels the display name field', () => {
+      renderLanding();
+      expect(screen.getByLabelText('اسم نمایشی')).toBeDefined();
+    });
+
+    it('labels the join input for screen readers', () => {
+      renderLanding();
+      expect(screen.getByLabelText('کد یا لینک میز')).toBeDefined();
+    });
+
+    it('explains what the saved room code is', () => {
+      renderLanding({
+        savedSession: { roomId: 'abc123', playerId: 'p1', apiUrl: 'https://api.test' },
+      });
+      expect(screen.getByText('کد میز')).toBeDefined();
+      expect(screen.getByText('abc123')).toBeDefined();
+    });
   });
 });

@@ -41,7 +41,7 @@ export async function startTelegramBot(): Promise<void> {
 
   bot.command('start', async (ctx) => {
     await ctx.reply(
-      'به حکم خوش اومدی 👑\nاز دکمه زیر می‌تونی وارد مینی‌اپ بشی و میز بسازی یا به دوستات وصل شی.',
+      'به حکم خوش اومدی ♠️\nاز دکمه زیر می‌تونی وارد مینی‌اپ بشی و میز بسازی یا به دوستات وصل شی.',
       { reply_markup: new InlineKeyboard().webApp('ورود به مینی‌اپ', buildWebAppUrl()) },
     );
   });

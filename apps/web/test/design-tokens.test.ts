@@ -512,3 +512,16 @@ describe('the trump sheet is a real bottom sheet', () => {
     expect(responsive).not.toContain('.trump-picker');
   });
 });
+
+describe('product decisions that must not regress', () => {
+  it('never uses a crown anywhere in the interface', () => {
+    // A crown reads as "hakem" to a Hokm player, so it cannot be used to mean
+    // "host". This was decided explicitly and had crept back into three places.
+    const files = readdirSync(srcDir, { recursive: true }) as string[];
+    for (const file of files) {
+      if (!/\.(ts|tsx|css)$/.test(file)) continue;
+      const source = readFileSync(path.join(srcDir, file), 'utf8');
+      expect(source, `${file} must not use a crown icon`).not.toContain('👑');
+    }
+  });
+});

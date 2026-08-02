@@ -298,3 +298,61 @@
 .row-actions--single {
   grid-template-columns: 1fr;
 }
+
+/* Player avatar, shared by the lobby and the table so the same person looks
+   the same in both places. */
+.avatar {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: var(--radius-pill);
+  font-weight: 800;
+  color: var(--text-primary);
+  background: linear-gradient(140deg, var(--violet-400), var(--mint-700));
+}
+
+.avatar--sm {
+  width: 30px;
+  height: 30px;
+  font-size: var(--text-xs);
+}
+
+.avatar--md {
+  width: 40px;
+  height: 40px;
+  font-size: var(--text-sm);
+}
+
+.avatar--lg {
+  width: 52px;
+  height: 52px;
+  font-size: var(--text-md);
+}
+
+/* Sides are coloured relative to the viewer, matching the table exactly. */
+.avatar--ours {
+  background: linear-gradient(140deg, var(--violet-500), var(--violet-600));
+}
+
+.avatar--theirs {
+  background: linear-gradient(140deg, var(--amber-500), var(--amber-600));
+  color: var(--card-black);
+}
+
+.avatar--empty {
+  background: var(--surface-2);
+  color: var(--text-muted);
+}
+
+/* Only visible to screen readers. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

@@ -86,12 +86,15 @@
 | پخش کارت | دانه‌دانه و نوبتی، از حاکم شروع؛ حتماً **قابل مشاهده** و نه سریع |
 | خروج از میز | آیکن کوچک در **گوشه‌ی بالا**، نه دکمه‌ی بزرگ پایین صفحه |
 | ریتم ربات‌ها | باید فاصله‌ی محسوس داشته باشند؛ نباید آنی بازی کنند |
+| هویت بازیکن | آواتار حروف اول، **مشترک بین لابی و میز** تا همان فرد در هر دو جا شناخته شود |
+| رنگ تیم | همیشه **نسبت به بیننده** (سمت خودت بنفش، حریف کهربایی) و هرگز فقط رنگ — همیشه برچسب متنی هم باشد |
+| فیلد آدرس بک‌اند | داخل تلگرام **پنهان** شود؛ فقط در مرورگر ساده لازم است |
 
 ---
 
 ## ۳) وضعیت فعلی پروژه
 
-**تست‌ها: ۸۱۳ تست، همه سبز** — game-engine ۱۲۲ · api ۲۳۲ · web ۴۵۹
+**تست‌ها: ۸۳۹ تست، همه سبز** — game-engine ۱۲۲ · api ۲۳۲ · web ۴۸۵
 `npm run build` ✅ · `npm run typecheck` ✅
 
 **فازهای تمام‌شده**
@@ -117,6 +120,8 @@
 - **فاز ۴.۴** — انتخاب حکم به‌صورت **bottom sheet** با تله‌ی فوکوس مشترک.
 - **فاز ۴.۵** — ادغام با تلگرام: haptic، رنگ هدر، `viewportStableHeight`،
   جلوگیری از بسته‌شدن با swipe. همه feature-detect شده و کاملاً اختیاری.
+- **فاز ۴.۶** — بازطراحی لابی و صفحه‌ی ورود: آواتار مشترک، نمایش صریح تیم‌ها در
+  لابی، حذف تاج ممنوعه، پنهان‌کردن فیلد توسعه‌دهنده داخل تلگرام.
 
 **قرعه‌کشی حاکم (اضافه‌شده در فاز ۴.۳)**
 حاکم قبلاً **همیشه صندلی ۰** بود. حالا با کشیدن کارت تا آمدن آس تعیین می‌شود:
@@ -149,9 +154,10 @@ apps/web/src/
   useTrickWonHaptic.ts  بازخورد لمسی وقتی تیم تو دستی را می‌برد
   api/         client.ts  socket.ts  session-storage.ts  share.ts  telegram-sdk.ts
   hooks/       useSession.ts  useRoomConnection.ts  useGameActions.ts  useLobbyActions.ts
-  components/  Landing  Lobby  GameTable  TableSeat  TrumpSheet  DuelPhasePanels
-               PlayingCard  Score  TopBar  StartOverlay  Toast  AbandonedNotice
-               ResumingScreen  RulesGuide  TableScreen  EntryScreen
+  components/  Landing  Lobby  LobbySeat  Avatar  GameTable  TableSeat
+               TrumpSheet  DuelPhasePanels  PlayingCard  Score  TopBar
+               StartOverlay  Toast  AbandonedNotice  ResumingScreen
+               RulesGuide  TableScreen  EntryScreen
   styles.css (فقط @import)
     + styles/{tokens,base,shell,landing,lobby,table,overlay,responsive}.css
 
@@ -397,10 +403,11 @@ ingress:
 
 ## ۱۲) قدم بعدی
 
-مرحله‌ی بعدی **۴.۶ — بازطراحی لابی و صفحه‌ی ورود** است.
+مرحله‌ی بعدی **۴.۷ — صیقل نهایی و بستن شکاف پوشش تست** است
+(`TableScreen.tsx` و `App.tsx` هنوز پوشش پایینی دارند، به‌علاوه بازبینی کنتراست
+و RTL).
 
 بعد از آن طبق `docs/ROADMAP.md`:
-- **۴.۷** صیقل نهایی و بستن شکاف پوشش تست
 - **۴.۸–۴.۱۱** حالت‌های بارگذاری، دسترس‌پذیری سطح بازی، پایداری بصری، لحن فارسی
 
 نقشه‌ی کامل فاز ۴ با جزئیات در `docs/ROADMAP.md` است.

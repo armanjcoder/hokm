@@ -95,8 +95,9 @@ describe('seat count follows the mode', () => {
   ] as const)('shows %i seats for %s', (mode, seats) => {
     cleanup();
     renderLobby({ room: room({ mode }) });
-    const labels = screen.getAllByText(/^صندلی \d$/);
-    expect(labels).toHaveLength(seats);
+    // Each chair is a labelled list item; the seat number lives in its
+    // accessible name rather than as visible text.
+    expect(screen.getAllByRole('listitem')).toHaveLength(seats);
   });
 });
 
@@ -174,5 +175,33 @@ describe('bot difficulty', () => {
     renderLobby({ room: withBot(), busy: true });
     const select = screen.getByLabelText('سطح سختی ربات نیکا') as HTMLSelectElement;
     expect(select.disabled).toBe(true);
+  });
+});
+
+describe('the lobby tells you who your partner is', () => {
+  it('marks the seat opposite as your partner in four player games', () => {
+    // Seat 0 and seat 2 are partners; the lobby must say so before the hand
+    // starts, not leave players to work it out from seat numbers.
+    renderLobby({ room: room({ mode: 'classic4' }) });
+    expect(screen.getByText('یار')).toBeDefined();
+  });
+
+  it('never claims a partner in solo modes', () => {
+    renderLobby({ room: room({ mode: 'solo3' }) });
+    expect(screen.queryByText('یار')).toBeNull();
+  });
+
+  it('groups seats into the viewer own side and the opposition', () => {
+    renderLobby({ room: room({ mode: 'classic4' }) });
+    const seats = screen.getAllByRole('listitem');
+    const ours = seats.filter((seat) => seat.className.includes('team-ours'));
+    const theirs = seats.filter((seat) => seat.className.includes('team-theirs'));
+    expect(ours).toHaveLength(2);
+    expect(theirs).toHaveLength(2);
+  });
+
+  it('exposes the seats as a labelled list', () => {
+    renderLobby({ room: room({ mode: 'classic4' }) });
+    expect(screen.getByRole('list', { name: 'صندلی‌های میز' })).toBeDefined();
   });
 });

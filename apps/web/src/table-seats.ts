@@ -156,11 +156,22 @@ export function seatLabel(view: SeatView): string {
  * Persian and Latin scripts.
  */
 export function seatInitials(view: SeatView): string {
-  const name = view.player?.name?.trim();
-  if (!name) return String(view.seat + 1);
-  const words = name.split(/\s+/).filter(Boolean).slice(0, 2);
+  return initialsFor(view.player?.name, view.seat);
+}
+
+/**
+ * Initials for any name, usable outside the table.
+ *
+ * Persian names have no reliable surname convention, so the first character of
+ * up to two words reads well in both Persian and Latin script. Falls back to
+ * the seat number so an empty chair still has something to show.
+ */
+export function initialsFor(name: string | undefined, seat: number): string {
+  const trimmed = name?.trim();
+  if (!trimmed) return String(seat + 1);
+  const words = trimmed.split(/\s+/).filter(Boolean).slice(0, 2);
   const initials = words.map((word) => [...word][0] ?? '').join('');
-  return initials || String(view.seat + 1);
+  return initials || String(seat + 1);
 }
 
 /**
