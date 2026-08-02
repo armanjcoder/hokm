@@ -8,6 +8,7 @@ import { TableSeat } from './TableSeat.js';
 import { TrumpSheet } from './TrumpSheet.js';
 import { buildSeatViews, drawMessage, teamRosters, turnMessage } from '../table-seats.js';
 import { useTrickHold } from '../useTrickHold.js';
+import { useTrickWonHaptic } from '../useTrickWonHaptic.js';
 import { useHakemDraw } from '../useHakemDraw.js';
 import { useDealSequence } from '../useDealSequence.js';
 
@@ -85,6 +86,8 @@ export function GameTable({
   // While the trick is being collected, every card leans towards the winner.
   const sweepTarget = sweepingTo === undefined ? undefined : seats.find((s) => s.seat === sweepingTo);
   const rosters = teamRosters(seats);
+  // A short buzz the moment your side takes a trick.
+  useTrickWonHaptic(game, me?.seat, config.teamPlay);
   // Cards are released one at a time so the deal can be watched.
   const dealtCount = useDealSequence(game, me?.seat);
   // Scores are keyed by absolute team index, but the strip is labelled from the

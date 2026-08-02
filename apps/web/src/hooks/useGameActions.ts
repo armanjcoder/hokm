@@ -1,6 +1,7 @@
 import type { Socket } from 'socket.io-client';
 import type { Card, PublicGameView, Suit } from '@hokm/game-engine';
 import { socketPayload, userMessage, type StoredSession } from '../lib.js';
+import { haptic } from '../telegram.js';
 import type { ConnectionStatus } from '../types.js';
 
 interface Options {
@@ -33,12 +34,16 @@ export interface GameActions {
 export function useGameActions({ socket, session, game, connection, setToast }: Options): GameActions {
   function requireConnection(): boolean {
     if (connection === 'connected') return true;
+    haptic('error');
     setToast('ارتباط با سرور قطع است. تا وصل شدن دوباره صبر کن.');
     return false;
   }
 
   function ackToast(response: any) {
     if (response?.ok === false) {
+      // A rejected move is worth feeling: the player usually has not noticed
+      // why nothing happened.
+      haptic('error');
       setToast(userMessage(response, 'این حرکت انجام نشد. دوباره تلاش کن.'));
     }
   }
@@ -47,11 +52,19 @@ export function useGameActions({ socket, session, game, connection, setToast }: 
     requireConnection,
     chooseSuit(suit) {
       if (!session || !requireConnection()) return;
+      haptic('select');
       socket.emit('game:choose_trump', { ...socketPayload(session), suit }, ackToast);
     },
     play(card) {
-      if (!session || !game?.validCardIds.includes(card.id)) return;
+      if (!session) return;
+      // Tapping a card that cannot be played is a real mistake, so say so with
+      // a buzz rather than silently ignoring the tap.
+      if (!game?.validCardIds.includes(card.id)) {
+        haptic('error');
+        return;
+      }
       if (!requireConnection()) return;
+      haptic('play');
       socket.emit('game:play_card', { ...socketPayload(session), cardId: card.id }, ackToast);
     },
     hakemDrawDone() {
@@ -70,10 +83,12 @@ export function useGameActions({ socket, session, game, connection, setToast }: 
     },
     discard(cardIds) {
       if (!session || !requireConnection()) return;
+      haptic('play');
       socket.emit('game:discard', { ...socketPayload(session), cardIds }, ackToast);
     },
     draw() {
       if (!session || !requireConnection()) return;
+      haptic('select');
       socket.emit('game:draw', socketPayload(session), ackToast);
     },
     resolveDraw(keep) {

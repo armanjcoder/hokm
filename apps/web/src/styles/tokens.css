@@ -149,6 +149,16 @@
   --shell-max: 980px;
   --tap-target: 44px;
 
+  /**
+   * Usable height.
+   *
+   * Inside the Telegram in-app browser `dvh` is unreliable, so `telegram.ts`
+   * publishes the host's own stable viewport as `--tg-viewport` and this
+   * prefers it. Outside Telegram the variable is never set and the fallback
+   * chain applies.
+   */
+  --app-height: var(--tg-viewport, 100dvh);
+
   /* Safe areas for notched phones. Fall back to 0 where unsupported. */
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-right: env(safe-area-inset-right, 0px);

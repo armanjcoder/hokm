@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { announceReady, loadTelegramSdk, SDK_TIMEOUT_MS } from '../src/api/telegram-sdk.js';
+import { loadTelegramSdk, SDK_TIMEOUT_MS } from '../src/api/telegram-sdk.js';
 
 /**
  * The Telegram SDK is served from `telegram.org`, which is blocked on some
@@ -95,19 +95,5 @@ describe('loadTelegramSdk', () => {
     const promise = loadTelegramSdk(doc, emptyWin(), 50);
     vi.advanceTimersByTime(51);
     await expect(promise).resolves.toBe('timeout');
-  });
-});
-
-describe('announceReady', () => {
-  it('calls ready and expand when the SDK loaded', () => {
-    const ready = vi.fn();
-    const expand = vi.fn();
-    announceReady({ Telegram: { WebApp: { ready, expand } } } as unknown as Window);
-    expect(ready).toHaveBeenCalledOnce();
-    expect(expand).toHaveBeenCalledOnce();
-  });
-
-  it('is a no-op when the SDK never loaded', () => {
-    expect(() => announceReady(emptyWin())).not.toThrow();
   });
 });

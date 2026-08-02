@@ -2,7 +2,7 @@
 
 .landing {
   min-height: 100vh;
-  min-height: 100dvh;
+  min-height: var(--app-height);
   display: grid;
   place-items: center;
   padding: calc(var(--space-6) + var(--safe-top)) calc(var(--space-6) + var(--safe-right))

@@ -205,15 +205,21 @@ describe('viewport and document head', () => {
 });
 
 describe('viewport height units', () => {
-  it('pairs every 100vh with a dvh fallback so mobile browser chrome is handled', () => {
+  it('backs every 100vh rule with the dynamic app height', () => {
     // On mobile, `vh` includes the collapsing URL bar, which pushes the sticky
-    // hand of cards below the fold. `dvh` tracks the visible viewport.
+    // hand of cards below the fold. `--app-height` resolves to Telegram's own
+    // viewport when present and to `dvh` everywhere else.
     for (const file of styleFiles) {
+      if (file === 'tokens.css') continue;
       const css = read(path.join(stylesDir, file));
       const vhCount = (css.match(/\d+vh\b/g) ?? []).length;
-      const dvhCount = (css.match(/\d+dvh\b/g) ?? []).length;
-      expect(dvhCount, `${file} should back each vh rule with a dvh rule`).toBe(vhCount);
+      const dynamicCount = (css.match(/var\(--app-height\)|\d+dvh\b/g) ?? []).length;
+      expect(dynamicCount, `${file} should back each vh rule with a dynamic height`).toBe(vhCount);
     }
+  });
+
+  it('resolves the app height to the Telegram viewport when it is available', () => {
+    expect(tokens).toMatch(/--app-height:\s*var\(--tg-viewport,\s*100dvh\)/);
   });
 });
 

@@ -237,3 +237,52 @@ describe('players are identifiable at the table', () => {
     expect(screen.getByText('قطع')).toBeDefined();
   });
 });
+
+describe('the table itself reports a won trick', () => {
+  // Testing the hook alone leaves the wiring unguarded, which is how a feature
+  // has shipped disconnected more than once in this project.
+  afterEach(() => {
+    delete (window as unknown as { Telegram?: unknown }).Telegram;
+  });
+
+  function installHaptics() {
+    const calls: string[] = [];
+    (window as unknown as { Telegram: unknown }).Telegram = {
+      WebApp: {
+        ready() {},
+        expand() {},
+        HapticFeedback: { notificationOccurred: (t: string) => calls.push(t) },
+      },
+    };
+    window.matchMedia = ((query: string) => ({
+      matches: false, media: query, addEventListener() {}, removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+    return calls;
+  }
+
+  const wonBy = (seat: number) =>
+    game({
+      phase: 'playing',
+      handScore: { tricks: { 0: 0, 1: 0 } },
+      currentTrick: {
+        leaderSeat: 0,
+        winnerSeat: seat,
+        plays: [0, 1, 2, 3].map((s) => ({
+          seat: s,
+          card: { id: `c${s}`, suit: 'spades', rank: 'A' },
+        })),
+      },
+    });
+
+  it('buzzes when the viewer side takes the trick', () => {
+    const calls = installHaptics();
+    renderTable(wonBy(2));
+    expect(calls).toEqual(['success']);
+  });
+
+  it('stays quiet when the opponents take it', () => {
+    const calls = installHaptics();
+    renderTable(wonBy(1));
+    expect(calls).toEqual([]);
+  });
+});

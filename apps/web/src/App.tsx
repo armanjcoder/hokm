@@ -22,7 +22,7 @@ import { RulesGuide } from './components/RulesGuide.js';
 import { TableScreen } from './components/TableScreen.js';
 import { renderEntryScreen } from './components/EntryScreen.js';
 import { shareRoom } from './api/share.js';
-import { announceReady } from './api/telegram-sdk.js';
+import { applyTelegramChrome, haptic, trackViewportHeight } from './telegram.js';
 
 const DEFAULT_API_URL = import.meta.env.VITE_API_URL || defaultApiUrl();
 
@@ -51,7 +51,10 @@ export function App() {
   const game = room?.game;
 
   useEffect(() => {
-    announceReady();
+    applyTelegramChrome();
+    // Telegram reports its own viewport, which is more reliable than `dvh`
+    // inside the in-app browser and excludes the on-screen keyboard.
+    return trackViewportHeight();
   }, []);
 
   useEffect(() => {
@@ -73,6 +76,7 @@ export function App() {
         // Everyone at the table sees the start animation, not just the last
         // player who pressed ready.
         if (previous?.status === 'lobby' && nextRoom.status === 'playing') setStarting(true);
+        notifyPhaseChange(previous, nextRoom);
         return nextRoom;
       }),
     onTokenUpgrade: (token) => sessionCtl.upgradeToken(token),
@@ -90,6 +94,14 @@ export function App() {
   const activateSession = sessionCtl.activate;
   const updateApiUrl = sessionCtl.updateApiUrl;
   const resumeSession = sessionCtl.resume;
+
+  /** Buzzes once when a hand or the match finishes, so a result is never missed. */
+  function notifyPhaseChange(previous: RoomView | null, next: RoomView) {
+    const was = previous?.game?.phase;
+    const now = next.game?.phase;
+    if (was === now) return;
+    if (now === 'hand_complete' || now === 'game_complete') haptic('finish');
+  }
 
   /** Drops the session and shows why the player was returned to the landing screen. */
   function forgetSession(message?: string) {

@@ -138,3 +138,89 @@ describe('useGameActions', () => {
     expect(JSON.stringify(emit.mock.calls[0]![1])).not.toContain('https://x');
   });
 });
+
+describe('game actions give physical feedback', () => {
+  function setup(over: { validCardIds?: string[]; connection?: string } = {}) {
+    const calls: string[] = [];
+    (window as any).Telegram = {
+      WebApp: {
+        ready() {},
+        expand() {},
+        HapticFeedback: {
+          impactOccurred: (s: string) => calls.push(`impact:${s}`),
+          notificationOccurred: (t: string) => calls.push(`notify:${t}`),
+          selectionChanged: () => calls.push('selection'),
+        },
+      },
+    };
+    window.matchMedia = ((q: string) => ({
+      matches: false, media: q, addEventListener() {}, removeEventListener() {},
+    })) as unknown as typeof window.matchMedia;
+
+    const emitted: any[] = [];
+    const socket = { emit: (...args: any[]) => emitted.push(args) } as never;
+    let actions: any;
+    function Probe() {
+      actions = useGameActions({
+        socket,
+        session: { roomId: 'r', playerId: 'p', apiUrl: 'https://a' },
+        game: { validCardIds: over.validCardIds ?? ['c1'] } as never,
+        connection: (over.connection ?? 'connected') as never,
+        setToast: () => {},
+      });
+      return null;
+    }
+    render(<Probe />);
+    return { calls, get actions() { return actions; }, emitted };
+  }
+
+  afterEach(() => {
+    delete (window as any).Telegram;
+  });
+
+  it('taps when you play a card', () => {
+    const h = setup();
+    h.actions.play({ id: 'c1' });
+    expect(h.calls).toContain('impact:light');
+  });
+
+  it('buzzes an error when the card cannot be played', () => {
+    // Silently ignoring the tap leaves the player wondering what happened.
+    const h = setup({ validCardIds: [] });
+    h.actions.play({ id: 'nope' });
+    expect(h.calls).toEqual(['notify:error']);
+    expect(h.emitted).toHaveLength(0);
+  });
+
+  it('buzzes an error when the connection is down', () => {
+    const h = setup({ connection: 'offline' });
+    h.actions.nextHand();
+    expect(h.calls).toContain('notify:error');
+  });
+
+  it('uses selection feedback for naming trump', () => {
+    const h = setup();
+    h.actions.chooseSuit('hearts');
+    expect(h.calls).toContain('selection');
+  });
+
+  it('works normally when there is no Telegram host', () => {
+    delete (window as any).Telegram;
+    const emitted: any[] = [];
+    const socket = { emit: (...args: any[]) => emitted.push(args) } as never;
+    let actions: any;
+    function Probe() {
+      actions = useGameActions({
+        socket,
+        session: { roomId: 'r', playerId: 'p', apiUrl: 'https://a' },
+        game: { validCardIds: ['c1'] } as never,
+        connection: 'connected' as never,
+        setToast: () => {},
+      });
+      return null;
+    }
+    render(<Probe />);
+    expect(() => actions.play({ id: 'c1' })).not.toThrow();
+    expect(emitted).toHaveLength(1);
+  });
+});

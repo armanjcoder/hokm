@@ -86,16 +86,43 @@ export const CONNECTION_LABELS: Record<ConnectionStatus, string> = {
   offline: 'آفلاین',
 };
 
+/**
+ * The parts of the Telegram Mini App SDK this app uses.
+ *
+ * Everything is optional: the app runs in a plain browser during development,
+ * and older Telegram clients ship older SDKs where newer methods simply do not
+ * exist. Every call site must therefore feature-detect rather than assume.
+ */
+export interface TelegramHaptics {
+  impactOccurred?: (style: 'light' | 'medium' | 'heavy' | 'rigid' | 'soft') => void;
+  notificationOccurred?: (type: 'error' | 'success' | 'warning') => void;
+  selectionChanged?: () => void;
+}
+
+export interface TelegramWebApp {
+  ready: () => void;
+  expand: () => void;
+  /** Raw signed payload. This is the only value the backend trusts. */
+  initData?: string;
+  initDataUnsafe?: { user?: { id: number; first_name?: string; username?: string } };
+  /** Added in Bot API 6.1. */
+  HapticFeedback?: TelegramHaptics;
+  /** Height excluding the on-screen keyboard; stable across scroll. */
+  viewportStableHeight?: number;
+  viewportHeight?: number;
+  onEvent?: (event: string, handler: () => void) => void;
+  offEvent?: (event: string, handler: () => void) => void;
+  /** Added in Bot API 6.1; only accepts a hex colour in 6.9+. */
+  setHeaderColor?: (color: string) => void;
+  setBackgroundColor?: (color: string) => void;
+  /** Keeps a swipe-down from closing the app mid-game. Bot API 7.7. */
+  disableVerticalSwipes?: () => void;
+  /** Version of the Bot API the host client implements, e.g. "7.0". */
+  version?: string;
+}
+
 declare global {
   interface Window {
-    Telegram?: {
-      WebApp?: {
-        ready: () => void;
-        expand: () => void;
-        /** Raw signed payload. This is the only value the backend trusts. */
-        initData?: string;
-        initDataUnsafe?: { user?: { id: number; first_name?: string; username?: string } };
-      };
-    };
+    Telegram?: { WebApp?: TelegramWebApp };
   }
 }

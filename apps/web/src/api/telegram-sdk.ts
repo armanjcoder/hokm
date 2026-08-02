@@ -48,9 +48,3 @@ export function loadTelegramSdk(
     doc.head.appendChild(script);
   });
 }
-
-/** Signals to Telegram that the Mini App is ready, if the SDK is present. */
-export function announceReady(win: Window = window): void {
-  win.Telegram?.WebApp?.ready();
-  win.Telegram?.WebApp?.expand();
-}
